@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "698749180404",
+    "firebase_url": "https://banknkonde-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "banknkonde",
+    "storage_bucket": "banknkonde.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:698749180404:android:33a1f97609d2f0b05101a1",
+        "android_client_info": {
+          "package_name": "com.example.bank_nkhonde"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCmbKmqCBq4lWLy-qePnIor4oOEyF8JxNE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:698749180404:android:b2c8473933be98765101a1",
+        "android_client_info": {
+          "package_name": "io.framework7.BankNkondeMw"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCmbKmqCBq4lWLy-qePnIor4oOEyF8JxNE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
