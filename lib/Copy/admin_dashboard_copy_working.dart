@@ -6,8 +6,8 @@ import 'package:bank_nkhonde/Login%20Page/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../Loan Management/loan_management_page.dart';
-import '../Loan Management/payment_management_page.dart';
+import '../Payment Management/loan_management_page.dart';
+import '../Payment Management/payment_management_page.dart';
 
 class AdminDashboard extends StatefulWidget {
   final bool isAdmin;

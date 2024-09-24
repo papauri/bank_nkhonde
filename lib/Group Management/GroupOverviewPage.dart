@@ -1,8 +1,8 @@
-import 'package:bank_nkhonde/Loan%20Management/PendingLoansPage.dart';
+import 'package:bank_nkhonde/Payment%20Management/PendingLoansPage.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../Loan Management/loan_management_page.dart';
-import '../Loan Management/payment_management_page.dart';
+import '../Payment Management/loan_management_page.dart';
+import '../Payment Management/payment_management_page.dart';
 import '../Account Management/member_management_page.dart';
 
 class GroupOverviewPage extends StatefulWidget {

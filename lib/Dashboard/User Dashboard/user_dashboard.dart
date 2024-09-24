@@ -1,26 +1,12 @@
+import 'package:bank_nkhonde/Landing%20Page/login_page.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'profile_section.dart';
 import 'group_section.dart';
-import 'package:bank_nkhonde/Login Page/login_page.dart';
+import 'quick_actions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-class UserDashboard extends StatefulWidget {
-  @override
-  _UserDashboardState createState() => _UserDashboardState();
-}
-
-class _UserDashboardState extends State<UserDashboard> {
-  String? currentUserId;
-
-  @override
-  void initState() {
-    super.initState();
-    currentUserId = FirebaseAuth.instance.currentUser?.uid;
-  }
-
-  Future<void> _refreshGroups() async {
-    setState(() {}); // Trigger a refresh
-  }
+class UserDashboard extends StatelessWidget {
+  final String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
   @override
   Widget build(BuildContext context) {
@@ -32,23 +18,20 @@ class _UserDashboardState extends State<UserDashboard> {
             icon: Icon(Icons.logout),
             onPressed: () {
               FirebaseAuth.instance.signOut();
-              Navigator.of(context).pushAndRemoveUntil(
+              Navigator.of(context).pushReplacement(
                 MaterialPageRoute(builder: (context) => LoginPage()),
-                (route) => false,
               );
             },
             tooltip: 'Logout',
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _refreshGroups,
-        child: ListView(
-          children: [
-            ProfileSection(),
-            GroupSection(currentUserId: currentUserId),
-          ],
-        ),
+      body: ListView(
+        children: [
+          ProfileSection(),
+          GroupSection(currentUserId: currentUserId),  // Group Section
+          QuickActions(),
+        ],
       ),
     );
   }
