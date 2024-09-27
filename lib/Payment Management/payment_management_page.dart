@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 
 class PaymentManagementPage extends StatefulWidget {
   final String groupId;
@@ -13,8 +13,10 @@ class PaymentManagementPage extends StatefulWidget {
 }
 
 class _PaymentManagementPageState extends State<PaymentManagementPage> {
+  int? _expandedTileIndex;
+
   Future<void> _refreshPayments() async {
-    setState(() {}); // Trigger a UI refresh
+    setState(() {}); // Trigger UI refresh
   }
 
   @override
@@ -22,6 +24,7 @@ class _PaymentManagementPageState extends State<PaymentManagementPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Payment Management'),
+        backgroundColor: Colors.teal[800], // Stylish background color
       ),
       body: RefreshIndicator(
         onRefresh: _refreshPayments,
@@ -30,6 +33,7 @@ class _PaymentManagementPageState extends State<PaymentManagementPage> {
               .collection('groups')
               .doc(widget.groupId)
               .collection('payments')
+              .orderBy('paymentDate', descending: true)
               .snapshots(),
           builder: (context, snapshot) {
             if (!snapshot.hasData) {
@@ -41,49 +45,28 @@ class _PaymentManagementPageState extends State<PaymentManagementPage> {
               return Center(child: Text('No payments found.'));
             }
 
-            return ListView.builder(
-              itemCount: payments.length,
-              itemBuilder: (context, index) {
-                final payment = payments[index];
-                return ListTile(
-                  title: Text('Payment from ${payment['payerName']}'),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Amount: MWK ${payment['amount']}'),
-                      Text('Status: ${payment['status']}'),
-                      Text('Payment Date: ${payment['paymentDate']}'),
-                    ],
-                  ),
-                  trailing: payment['status'] == 'pending'
-                      ? Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: Icon(Icons.check, color: Colors.green),
-                              onPressed: () {
-                                _confirmPayment(payment.id, payment['amount'], payment['payerName']);
+            // Group payments by status, month, and user
+            Map<String, Map<String, Map<String, List<QueryDocumentSnapshot>>>> groupedPayments = {};
 
-                              },
-                              tooltip: 'Confirm Payment',
-                            ),
-                            IconButton(
-                              icon: Icon(Icons.cancel, color: Colors.red),
-                              onPressed: () {
-                                _rejectPaymentDialog(payment.id);
-                              },
-                              tooltip: 'Reject Payment',
-                            ),
-                          ],
-                        )
-                      : Text(payment['status'] == 'confirmed'
-                          ? 'Confirmed'
-                          : 'Rejected'),
-                  onTap: () {
-                    _showPaymentDetails(context, payment);
-                  },
-                );
-              },
+            for (var payment in payments) {
+              final paymentDate = (payment['paymentDate'] as Timestamp).toDate();
+              String monthYear = DateFormat('MMMM yyyy').format(paymentDate);
+              String status = payment['status'];
+              String payerName = payment['payerName'];
+
+              groupedPayments[status] = groupedPayments[status] ?? {};
+              groupedPayments[status]![monthYear] = groupedPayments[status]![monthYear] ?? {};
+              groupedPayments[status]![monthYear]![payerName] = groupedPayments[status]![monthYear]![payerName] ?? [];
+              groupedPayments[status]![monthYear]![payerName]!.add(payment);
+            }
+
+            return ListView(
+              padding: const EdgeInsets.all(16.0),
+              children: [
+                _buildPaymentSection('Pending Payments', groupedPayments['pending'], Icons.pending_actions, Colors.orange),
+                _buildPaymentSection('Confirmed Payments', groupedPayments['confirmed'], Icons.check_circle, Colors.green),
+                _buildPaymentSection('Rejected Payments', groupedPayments['rejected'], Icons.cancel, Colors.redAccent),
+              ],
             );
           },
         ),
@@ -91,51 +74,165 @@ class _PaymentManagementPageState extends State<PaymentManagementPage> {
     );
   }
 
-void _confirmPayment(String paymentId, double amount, String payerName) async {
-  try {
-    // Confirm the payment and update payment status to 'confirmed'
-    await FirebaseFirestore.instance
-        .collection('groups')
-        .doc(widget.groupId)
-        .collection('payments')
-        .doc(paymentId)
-        .update({
-      'status': 'confirmed',
-    });
+  Widget _buildPaymentSection(String title, Map<String, Map<String, List<QueryDocumentSnapshot>>>? paymentsByMonth, IconData icon, Color statusColor) {
+    if (paymentsByMonth == null || paymentsByMonth.isEmpty) {
+      return Container(); // Hide if empty
+    }
 
-    // Update total contributions in the group document
-    DocumentReference groupDoc = FirebaseFirestore.instance
-        .collection('groups')
-        .doc(widget.groupId);
+    return Card(
+      margin: EdgeInsets.symmetric(vertical: 8),
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ExpansionTile(
+        leading: Icon(icon, color: statusColor, size: 30),
+        title: Text(
+          title,
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: statusColor),
+        ),
+        children: paymentsByMonth.entries.map((monthEntry) {
+          String monthYear = monthEntry.key;
+          Map<String, List<QueryDocumentSnapshot>> paymentsByUser = monthEntry.value;
 
-    FirebaseFirestore.instance.runTransaction((transaction) async {
-      DocumentSnapshot groupSnapshot = await transaction.get(groupDoc);
-      if (groupSnapshot.exists) {
-        double currentTotalContributions =
-            groupSnapshot['totalContributions']?.toDouble() ?? 0.0;
-        transaction.update(groupDoc, {
-          'totalContributions': currentTotalContributions + amount,
-        });
-
-        // Log confirmed payments in 'confirmedPayments' sub-collection
-        transaction.set(groupDoc.collection('confirmedPayments').doc(), {
-          'payerName': payerName,
-          'amount': amount,
-          'confirmedAt': Timestamp.now(),
-        });
-      }
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Payment confirmed successfully!')),
-    );
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Failed to confirm payment. Try again.')),
+          return _buildMonthSection(monthYear, paymentsByUser);
+        }).toList(),
+      ),
     );
   }
-}
 
+  Widget _buildMonthSection(String monthYear, Map<String, List<QueryDocumentSnapshot>> paymentsByUser) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          color: Colors.teal[50],
+          child: Text(
+            monthYear,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+          ),
+        ),
+        ...paymentsByUser.entries.map((userEntry) {
+          String payerName = userEntry.key;
+          List<QueryDocumentSnapshot> userPayments = userEntry.value;
+
+          return ExpansionTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.teal[100],
+              child: Icon(Icons.person, color: Colors.teal[800]),
+            ),
+            title: Text(
+              payerName,
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            ),
+            initiallyExpanded: _expandedTileIndex == userPayments.hashCode,
+            onExpansionChanged: (expanded) {
+              setState(() {
+                _expandedTileIndex = expanded ? userPayments.hashCode : null;
+              });
+            },
+            children: userPayments.map((payment) {
+              return ListTile(
+                leading: Icon(
+                  payment['status'] == 'confirmed' ? Icons.check_circle : Icons.pending,
+                  color: payment['status'] == 'confirmed' ? Colors.green : Colors.orange,
+                ),
+                title: Text('MWK ${payment['amount']}'),
+                subtitle: Text(
+                  'Payment Date: ${_formatDate(payment['paymentDate'])}',
+                  style: TextStyle(fontSize: 12),
+                ),
+                trailing: _buildPaymentActions(payment),
+              );
+            }).toList(),
+          );
+        }).toList(),
+      ],
+    );
+  }
+
+  Widget _buildPaymentActions(QueryDocumentSnapshot payment) {
+    if (payment['status'] == 'pending') {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: Icon(Icons.check, color: Colors.green),
+            onPressed: () {
+              _confirmPayment(payment.id, payment['amount'], payment['payerName']);
+            },
+            tooltip: 'Confirm Payment',
+          ),
+          IconButton(
+            icon: Icon(Icons.cancel, color: Colors.red),
+            onPressed: () {
+              _rejectPaymentDialog(payment.id);
+            },
+            tooltip: 'Reject Payment',
+          ),
+        ],
+      );
+    } else {
+      return Text(
+        payment['status'] == 'confirmed' ? 'Confirmed' : 'Rejected',
+        style: TextStyle(color: payment['status'] == 'confirmed' ? Colors.green : Colors.redAccent),
+      );
+    }
+  }
+
+  String _formatDate(Timestamp timestamp) {
+    DateTime date = timestamp.toDate();
+    return DateFormat('EEEE, MMM d, yyyy').format(date);
+  }
+
+  void _confirmPayment(String paymentId, double amount, String payerName) async {
+    try {
+      DocumentReference groupDoc = FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId);
+
+      await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .collection('payments')
+          .doc(paymentId)
+          .update({
+        'status': 'confirmed',
+      });
+
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        DocumentSnapshot groupSnapshot = await transaction.get(groupDoc);
+
+        if (groupSnapshot.exists) {
+          double currentTotalContributions = groupSnapshot['totalContributions']?.toDouble() ?? 0.0;
+
+          double updatedTotalContributions = currentTotalContributions + amount;
+
+          transaction.update(groupDoc, {
+            'totalContributions': updatedTotalContributions,
+          });
+
+          transaction.set(groupDoc.collection('confirmedPayments').doc(), {
+            'payerName': payerName,
+            'amount': amount,
+            'confirmedAt': Timestamp.now(),
+          });
+        }
+      });
+
+      _refreshPayments();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Payment confirmed and contributions updated!')),
+      );
+    } catch (e) {
+      print("Error confirming payment: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to confirm payment.')),
+      );
+    }
+  }
 
   void _rejectPayment(String paymentId, String reason) async {
     try {
@@ -146,7 +243,7 @@ void _confirmPayment(String paymentId, double amount, String payerName) async {
           .doc(paymentId)
           .update({
         'status': 'rejected',
-        'reason': reason, // Add the rejection reason
+        'reason': reason,
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Payment rejected successfully!')),
@@ -159,81 +256,37 @@ void _confirmPayment(String paymentId, double amount, String payerName) async {
   }
 
   void _rejectPaymentDialog(String paymentId) {
-    final TextEditingController _reasonController = TextEditingController();
+  final TextEditingController _reasonController = TextEditingController();
 
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('Reject Payment'),
-          content: TextField(
-            controller: _reasonController,
-            decoration: InputDecoration(labelText: 'Reason for rejection'),
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: Text('Reject Payment'),
+        content: TextField(
+          controller: _reasonController,
+          decoration: InputDecoration(
+            labelText: 'Reason for rejection',
+            hintText: 'Enter the reason for rejecting this payment',
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                _rejectPayment(paymentId, _reasonController.text.trim());
-                Navigator.pop(context);
-              },
-              child: Text('Reject Payment'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showPaymentDetails(BuildContext context, QueryDocumentSnapshot payment) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('Payment Details'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Payer: ${payment['payerName']}'),
-              Text('Amount: MWK ${payment['amount']}'),
-              Text('Status: ${payment['status']}'),
-              Text('Payment Date: ${payment['paymentDate']}'),
-              if (payment['status'] == 'rejected')
-                Text('Rejection Reason: ${payment['reason']}'),
-              SizedBox(height: 10),
-              TextButton(
-                onPressed: () {
-                  _copyPaymentInfo(payment);
-                },
-                child: Text('Copy Payment Info'),
-              ),
-            ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // Close dialog
+            },
+            child: Text('Cancel'),
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: Text('Close'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _copyPaymentInfo(QueryDocumentSnapshot payment) {
-    final paymentInfo =
-        'Payer: ${payment['payerName']}\nAmount: MWK ${payment['amount']}\nStatus: ${payment['status']}\nPayment Date: ${payment['paymentDate']}';
-    Clipboard.setData(ClipboardData(text: paymentInfo));
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Payment info copied to clipboard!')),
-    );
-  }
+          ElevatedButton(
+            onPressed: () {
+              _rejectPayment(paymentId, _reasonController.text.trim());
+              Navigator.pop(context); // Close dialog after rejection
+            },
+            child: Text('Reject Payment'),
+          ),
+        ],
+      );
+    },
+  );
+}
 }

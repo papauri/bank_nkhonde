@@ -108,9 +108,8 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
       appBar: AppBar(
         title: Text(widget.groupName),
         centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 1,
-        foregroundColor: Colors.black,
+        backgroundColor: Colors.teal,
+        elevation: 0,
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -122,7 +121,7 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
           child: Column(
             children: [
               _buildHeaderSection(),
-              _buildStatsList(),
+              _buildStatsGrid(),
               _buildActionButtons(),
             ],
           ),
@@ -133,48 +132,54 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
 
   Widget _buildHeaderSection() {
     return Container(
-      padding: EdgeInsets.symmetric(vertical: 30, horizontal: 20),
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.teal,
+        borderRadius: BorderRadius.vertical(
+          bottom: Radius.circular(30),
+        ),
+      ),
       child: Column(
         children: [
           Text(
             'Total Funds Available',
-            style: TextStyle(color: Colors.grey[600], fontSize: 16),
+            style: TextStyle(color: Colors.white70, fontSize: 16),
           ),
           SizedBox(height: 10),
           Text(
             'MWK ${totalFunds.toStringAsFixed(2)}',
-            style: TextStyle(
-                color: Colors.black, fontSize: 36, fontWeight: FontWeight.bold),
+            style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStatsList() {
+  Widget _buildStatsGrid() {
     return Padding(
       padding: EdgeInsets.all(16),
       child: Column(
         children: [
-          _buildStatItem(
+          _buildStatCard(
             title: 'Total Contributions',
             value: 'MWK ${totalContributions.toStringAsFixed(2)}',
             icon: Icons.attach_money,
+            color: Colors.green,
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) =>
-                      ContributionsOverviewPage(groupId: widget.groupId),
+                  builder: (context) => ContributionsOverviewPage(groupId: widget.groupId),
                 ),
               );
             },
           ),
-          _buildStatItem(
+          _buildStatCard(
             title: 'Pending Loans',
             value: 'MWK ${pendingLoanAmount.toStringAsFixed(2)}',
             subtitle: 'Applicants: $pendingLoanApplicants',
             icon: Icons.hourglass_empty,
+            color: Colors.orange,
             onTap: () {
               Navigator.push(
                 context,
@@ -187,29 +192,32 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
               );
             },
           ),
-          _buildStatItem(
+          _buildStatCard(
             title: 'Seed Money',
             value: 'MWK ${seedMoney.toStringAsFixed(2)}',
             icon: Icons.money,
+            color: Colors.blue,
           ),
-          _buildStatItem(
+          _buildStatCard(
             title: 'Interest Rate',
             value: '${interestRate.toStringAsFixed(2)}%',
             icon: Icons.percent,
+            color: Colors.purple,
           ),
-          _buildStatItem(
+          _buildStatCard(
             title: 'Monthly Contribution',
             value: 'MWK ${fixedAmount.toStringAsFixed(2)}',
             icon: Icons.calendar_today,
+            color: Colors.indigo,
           ),
           SizedBox(height: 20),
-          ElevatedButton(
+          ElevatedButton.icon(
             onPressed: _showEditParametersDialog,
-            child: Text('Edit Group Parameters'),
+            icon: Icon(Icons.edit),
+            label: Text('Edit Group Parameters'),
             style: ElevatedButton.styleFrom(
               minimumSize: Size(double.infinity, 50),
-              backgroundColor: Colors.black,
-              foregroundColor: Colors.white,
+              backgroundColor: Colors.teal, // Use 'backgroundColor' instead of 'primary'
             ),
           ),
         ],
@@ -217,22 +225,31 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
     );
   }
 
-  Widget _buildStatItem({
+  Widget _buildStatCard({
     required String title,
     required String value,
     String? subtitle,
     required IconData icon,
+    required Color color,
     Function()? onTap,
   }) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.black),
-      title: Text(title),
-      subtitle: subtitle != null ? Text(subtitle) : null,
-      trailing: Text(
-        value,
-        style: TextStyle(fontWeight: FontWeight.bold),
+    return Card(
+      margin: EdgeInsets.symmetric(vertical: 8),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: color.withOpacity(0.1),
+          child: Icon(icon, color: color),
+        ),
+        title: Text(title),
+        subtitle: subtitle != null ? Text(subtitle) : null,
+        trailing: Text(
+          value,
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        onTap: onTap,
       ),
-      onTap: onTap,
     );
   }
 
@@ -244,6 +261,7 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
           _buildActionButton(
             label: 'View Members',
             icon: Icons.group,
+            color: Colors.blue,
             onPressed: () {
               Navigator.push(
                 context,
@@ -259,6 +277,7 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
           _buildActionButton(
             label: 'Manage Loans',
             icon: Icons.monetization_on,
+            color: Colors.green,
             onPressed: () {
               Navigator.push(
                 context,
@@ -274,6 +293,7 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
           _buildActionButton(
             label: 'Manage Payments',
             icon: Icons.payment,
+            color: Colors.orange,
             onPressed: () {
               Navigator.push(
                 context,
@@ -294,20 +314,21 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
   Widget _buildActionButton({
     required String label,
     required IconData icon,
+    required Color color,
     required Function() onPressed,
   }) {
     return Container(
       width: double.infinity,
       margin: EdgeInsets.symmetric(vertical: 6),
-      child: OutlinedButton.icon(
+      child: ElevatedButton.icon(
         onPressed: onPressed,
-        icon: Icon(icon, color: Colors.black),
-        label: Text(label, style: TextStyle(color: Colors.black)),
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(color: Colors.black),
+        icon: Icon(icon),
+        label: Text(label),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color, // Use 'backgroundColor' instead of 'primary'
+          foregroundColor: Colors.white, // Use 'foregroundColor' instead of 'onPrimary'
           padding: EdgeInsets.symmetric(vertical: 14),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       ),
     );
@@ -344,8 +365,7 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
                 SizedBox(height: 10),
                 Text(
                   'Changing these parameters will affect existing loans and contributions. Proceed with caution.',
-                  style: TextStyle(
-                      color: Colors.red, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -353,7 +373,7 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('Cancel', style: TextStyle(color: Colors.black)),
+              child: Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () {
@@ -365,10 +385,7 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
                 Navigator.pop(context);
               },
               child: Text('Save Changes'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                foregroundColor: Colors.white,
-              ),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
             ),
           ],
         );
@@ -420,8 +437,7 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text('Failed to update group parameters. Try again.')),
+        SnackBar(content: Text('Failed to update group parameters. Try again.')),
       );
     }
   }

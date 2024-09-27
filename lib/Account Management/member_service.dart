@@ -11,6 +11,7 @@ class MemberService {
     required String password,
     required bool isAdmin,
   }) async {
+    // Create user in Firebase Authentication
     UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
       email: email,
       password: password,
@@ -18,6 +19,7 @@ class MemberService {
     User? user = userCredential.user;
 
     if (user != null) {
+      // Add member to the 'groups' collection with default values
       await FirebaseFirestore.instance
           .collection('groups')
           .doc(groupId)
@@ -30,11 +32,13 @@ class MemberService {
         }])
       });
 
+      // Add user to 'users' collection with default profilePicture
       await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
         'name': memberName,
         'contact': memberContact,
         'email': email,
         'role': isAdmin ? 'admin' : 'user',
+        'profilePicture': '',  // Set default empty profilePicture
       });
     }
   }
@@ -49,7 +53,7 @@ class MemberService {
     required String newRole,
     required Map<String, dynamic> oldMember,
   }) async {
-    // Remove the old member record
+    // Remove the old member record from the group
     await FirebaseFirestore.instance
         .collection('groups')
         .doc(groupId)
@@ -57,7 +61,7 @@ class MemberService {
       'members': FieldValue.arrayRemove([oldMember])
     });
 
-    // Add updated details
+    // Add updated member details to the group
     await FirebaseFirestore.instance
         .collection('groups')
         .doc(groupId)
@@ -70,7 +74,7 @@ class MemberService {
       }])
     });
 
-    // Update user collection
+    // Update the user's document in 'users' collection
     await FirebaseFirestore.instance
         .collection('users')
         .doc(memberId)
@@ -82,13 +86,24 @@ class MemberService {
     });
   }
 
-  // Delete a member
+  // Delete a member from Firebase Auth, 'groups', and 'users' collections
   static Future<void> deleteMember(String memberId, Map<String, dynamic> member, String groupId) async {
+    // Remove the member from the 'groups' collection
     await FirebaseFirestore.instance
         .collection('groups')
         .doc(groupId)
         .update({
       'members': FieldValue.arrayRemove([member])
     });
+
+    // Delete the user document from the 'users' collection
+    await FirebaseFirestore.instance.collection('users').doc(memberId).delete();
+
+    // Delete the user from Firebase Authentication using the Firebase Admin SDK
+    try {
+      await FirebaseAuth.instance.currentUser?.delete();
+    } catch (e) {
+      print('Error deleting user from Firebase Auth: $e');
+    }
   }
 }

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
-class ConfirmedContributionsPage extends StatelessWidget {
+class ContributionsOverviewPage extends StatelessWidget {
   final String groupId;
 
-  ConfirmedContributionsPage({required this.groupId});
+  ContributionsOverviewPage({required this.groupId});
 
   @override
   Widget build(BuildContext context) {
@@ -16,7 +17,8 @@ class ConfirmedContributionsPage extends StatelessWidget {
         stream: FirebaseFirestore.instance
             .collection('groups')
             .doc(groupId)
-            .collection('confirmedPayments')
+            .collection('payments')
+            .where('status', isEqualTo: 'confirmed') // Filter for confirmed payments
             .snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
@@ -33,13 +35,13 @@ class ConfirmedContributionsPage extends StatelessWidget {
             itemCount: contributions.length,
             itemBuilder: (context, index) {
               final contribution = contributions[index];
-              final payerName = contribution['payerName'];
-              final amount = contribution['amount'];
-              final confirmedAt = (contribution['confirmedAt'] as Timestamp).toDate();
+              final paymentDate = contribution['paymentDate'].toDate();
+              final formattedDate = DateFormat('EEEE, MMM d, y').format(paymentDate);
 
               return ListTile(
-                title: Text(payerName),
-                subtitle: Text('Amount: MWK $amount\nConfirmed at: $confirmedAt'),
+                title: Text('Payer: ${contribution['payerName']}'),
+                subtitle: Text('Amount: MWK ${contribution['amount']}'),
+                trailing: Text('Confirmed on: $formattedDate'), // Display user-friendly date
               );
             },
           );

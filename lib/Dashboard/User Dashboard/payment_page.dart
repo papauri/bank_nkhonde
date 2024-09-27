@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PaymentPage extends StatefulWidget {
-  final String groupId; // Make sure the groupId is passed from the previous page
+  final String groupId; // Group ID passed from the previous page
   PaymentPage({required this.groupId});
 
   @override
@@ -13,12 +13,12 @@ class PaymentPage extends StatefulWidget {
 class _PaymentPageState extends State<PaymentPage> {
   final TextEditingController _amountController = TextEditingController();
   String? selectedPaymentType = 'Monthly Contribution';
-  String? payerName = 'Unknown User'; // Default if name is not fetched
+  String? payerName = 'Unknown User'; // Default if the name is not fetched
 
   @override
   void initState() {
     super.initState();
-    _fetchUserName(); // Fetch the user's name when the page loads
+    _fetchUserName(); // Fetch the user's name on page load
   }
 
   Future<void> _fetchUserName() async {
@@ -31,7 +31,7 @@ class _PaymentPageState extends State<PaymentPage> {
 
       if (userDoc.exists) {
         setState(() {
-          payerName = userDoc['name'] ?? 'Unknown User'; // Fetch user's name
+          payerName = userDoc['name'] ?? 'Unknown User'; // Fetch the user's name
         });
       }
     }
@@ -47,24 +47,24 @@ class _PaymentPageState extends State<PaymentPage> {
     }
 
     try {
-      // Submit payment to Firestore under the 'payments' collection of the group
+      // Submit payment under the 'payments' collection of the group
       await FirebaseFirestore.instance
           .collection('groups')
           .doc(widget.groupId)
           .collection('payments')
           .add({
         'userId': FirebaseAuth.instance.currentUser?.uid,
-        'payerName': payerName, // Pass the fetched user name
+        'payerName': payerName, // Include the payer's name
         'amount': double.parse(amount),
         'paymentType': selectedPaymentType,
-        'status': 'pending', // Set the initial status to 'pending'
+        'status': 'pending', // Initial status set to 'pending'
         'paymentDate': Timestamp.now(),
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Payment submitted successfully!')),
       );
-      Navigator.pop(context);
+      Navigator.pop(context); // Go back to the previous page
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to submit payment. Please try again.')),

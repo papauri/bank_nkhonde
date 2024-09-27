@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'add_member.dart';
-import 'edit_member.dart';
+import 'add_member_by_admin.dart';
+import 'edit_member_by_admin.dart';
 import 'member_service.dart';
 
 class MemberManagementPage extends StatefulWidget {
