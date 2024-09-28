@@ -167,15 +167,17 @@ class _RegistrationPageState extends State<RegistrationPage> {
       User? user = userCredential.user;
 
       if (user != null) {
-        String defaultProfilePictureUrl = ''; 
+        // Default Material Icon DP (Flutter Icons)
+        String defaultIcon = 'account_circle';  // Store the material icon as a string
 
-        // Save admin details in Firestore
+        // Save admin details in Firestore (in 'users' collection)
         await _db.collection('users').doc(user.uid).set({
+          'userId': user.uid,  // Ensure the user ID is stored
           'name': name,
           'email': email,
           'phone': phone,
-          'role': 'admin',
-          'profilePicture': defaultProfilePictureUrl,
+          'role': 'admin',  // Ensure the role is admin
+          'profilePicture': defaultIcon,  // Store the icon name as the profile picture
           'createdAt': Timestamp.now(),
         });
 
@@ -184,6 +186,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
           await _createGroup(user.uid, name, phone, email);
         }
 
+        // Navigate to Admin Dashboard after successful registration
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -219,14 +222,15 @@ class _RegistrationPageState extends State<RegistrationPage> {
       'createdAt': Timestamp.now(),
     });
 
-    // Automatically add the admin as a member of the group using the correct collection
+    // Add the admin as a member of the group using the 'members' array in the same document
     await groupRef.update({
       'members': FieldValue.arrayUnion([{
         'userId': adminId,
         'name': name,
         'contact': phone,
         'email': email,
-        'role': 'admin',
+        'role': 'admin',  // Mark the role as 'admin'
+        'profilePicture': 'account_circle',  // Use Material icon for the profile picture
       }]),
     });
   }

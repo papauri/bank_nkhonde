@@ -239,7 +239,7 @@ class _LoginPageState extends State<LoginPage> {
           final data = userDoc.data() as Map<String, dynamic>?;
 
           if (data != null) {
-            String role = data['role'] ?? 'user';
+            String role = data['role'] ?? 'member';
             String groupName = data['groupName'] ?? 'No Group';
 
             // Navigate based on the role stored in Firestore
@@ -254,7 +254,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
               );
-            } else if (role == 'user') {
+            } else if (role == 'member') {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
