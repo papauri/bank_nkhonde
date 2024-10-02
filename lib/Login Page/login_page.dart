@@ -215,7 +215,7 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  void _submit() async {
+void _submit() async {
     String email = _emailController.text.trim();
     String password = _passwordController.text.trim();
 
@@ -225,6 +225,7 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
+      // Sign in with Firebase Authentication
       UserCredential userCredential = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
@@ -239,11 +240,12 @@ class _LoginPageState extends State<LoginPage> {
           final data = userDoc.data() as Map<String, dynamic>?;
 
           if (data != null) {
-            String role = data['role'] ?? 'member';
+            String role = data['role'] ?? 'member'; // Fetch the role, default to 'member'
             String groupName = data['groupName'] ?? 'No Group';
 
             // Navigate based on the role stored in Firestore
-            if (role == 'admin') {
+            if (isAdminLogin && role == 'admin') {
+              // Admin login logic
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
@@ -254,17 +256,19 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
               );
-            } else if (role == 'member') {
+            } else if (!isAdminLogin && role == 'member') {
+              // Member login logic
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
-                  builder: (context) =>
-                      UserDashboard(), // Navigate to the user dashboard
+                  builder: (context) => UserDashboard(
+                    isAdmin: false, // Ensure that the user is not an admin
+                  ),
                 ),
               );
             } else {
               setState(() {
-                errorMessage = 'Invalid role. Please contact support.';
+                errorMessage = 'Invalid login attempt. Please check your role.';
               });
             }
           }
@@ -284,6 +288,7 @@ class _LoginPageState extends State<LoginPage> {
       });
     }
   }
+
 
   String _getErrorMessage(FirebaseAuthException error) {
     switch (error.code) {

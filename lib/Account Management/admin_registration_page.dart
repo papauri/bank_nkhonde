@@ -13,12 +13,16 @@ class _RegistrationPageState extends State<RegistrationPage> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  // Add a new controller for the invitation code
+  final TextEditingController _invitationCodeController =
+      TextEditingController();
 
   // Group creation fields
   final TextEditingController _groupNameController = TextEditingController();
   final TextEditingController _seedMoneyController = TextEditingController();
   final TextEditingController _interestRateController = TextEditingController();
-  final TextEditingController _monthlyContributionController = TextEditingController();
+  final TextEditingController _monthlyContributionController =
+      TextEditingController();
 
   bool isLoading = false;
   String errorMessage = '';
@@ -69,10 +73,15 @@ class _RegistrationPageState extends State<RegistrationPage> {
           SizedBox(height: 20),
           _buildTextField(_phoneController, 'Phone Number', Icons.phone),
           SizedBox(height: 20),
-          _buildTextField(_emailController, 'Email Address', Icons.email_outlined),
+          _buildTextField(
+              _emailController, 'Email Address', Icons.email_outlined),
           SizedBox(height: 20),
-          _buildTextField(_passwordController, 'Password', Icons.lock_outline, obscureText: true),
+          _buildTextField(_passwordController, 'Password', Icons.lock_outline,
+              obscureText: true),
           SizedBox(height: 40),
+          // In your _buildRegistrationForm method, add the invitation code field
+          _buildTextField(
+              _invitationCodeController, 'Invitation Code', Icons.vpn_key),
 
           // Checkbox for Group creation option
           CheckboxListTile(
@@ -87,11 +96,14 @@ class _RegistrationPageState extends State<RegistrationPage> {
           if (createGroup) ...[
             _buildTextField(_groupNameController, 'Group Name', Icons.group),
             SizedBox(height: 20),
-            _buildTextField(_seedMoneyController, 'Seed Money (MWK)', Icons.money),
+            _buildTextField(
+                _seedMoneyController, 'Seed Money (MWK)', Icons.money),
             SizedBox(height: 20),
-            _buildTextField(_interestRateController, 'Interest Rate (%)', Icons.percent),
+            _buildTextField(
+                _interestRateController, 'Interest Rate (%)', Icons.percent),
             SizedBox(height: 20),
-            _buildTextField(_monthlyContributionController, 'Monthly Contribution (MWK)', Icons.attach_money),
+            _buildTextField(_monthlyContributionController,
+                'Monthly Contribution (MWK)', Icons.attach_money),
             SizedBox(height: 40),
           ],
 
@@ -126,7 +138,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {bool obscureText = false}) {
+  Widget _buildTextField(
+      TextEditingController controller, String label, IconData icon,
+      {bool obscureText = false}) {
     return TextField(
       controller: controller,
       obscureText: obscureText,
@@ -146,10 +160,17 @@ class _RegistrationPageState extends State<RegistrationPage> {
     String password = _passwordController.text.trim();
     String name = _nameController.text.trim();
     String phone = _phoneController.text.trim();
+    String invitationCode =
+        _invitationCodeController.text.trim(); // Get the invitation code
 
-    if (email.isEmpty || password.isEmpty || name.isEmpty || phone.isEmpty) {
+    if (email.isEmpty ||
+        password.isEmpty ||
+        name.isEmpty ||
+        phone.isEmpty ||
+        invitationCode.isEmpty) {
       setState(() {
-        errorMessage = 'Please fill all required fields.';
+        errorMessage =
+            'Please fill all required fields, including the invitation code.';
       });
       return;
     }
@@ -160,7 +181,24 @@ class _RegistrationPageState extends State<RegistrationPage> {
     });
 
     try {
-      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+      // Validate invitation code
+      QuerySnapshot snapshot = await _db
+          .collection('invitationCodes')
+          .where('code', isEqualTo: invitationCode)
+          .where('used', isEqualTo: false)
+          .get();
+
+      if (snapshot.docs.isEmpty) {
+        setState(() {
+          errorMessage = 'Invalid or used invitation code. Please try again.';
+          isLoading = false;
+        });
+        return;
+      }
+
+      // Proceed with registration
+      UserCredential userCredential =
+          await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -168,18 +206,27 @@ class _RegistrationPageState extends State<RegistrationPage> {
 
       if (user != null) {
         // Default Material Icon DP (Flutter Icons)
-        String defaultIcon = 'account_circle';  // Store the material icon as a string
+        String defaultIcon =
+            'account_circle'; // Store the material icon as a string
 
         // Save admin details in Firestore (in 'users' collection)
         await _db.collection('users').doc(user.uid).set({
-          'userId': user.uid,  // Ensure the user ID is stored
+          'userId': user.uid, // Ensure the user ID is stored
           'name': name,
           'email': email,
           'phone': phone,
-          'role': 'admin',  // Ensure the role is admin
-          'profilePicture': defaultIcon,  // Store the icon name as the profile picture
+          'role': 'admin', // Ensure the role is admin
+          'profilePicture':
+              defaultIcon, // Store the icon name as the profile picture
           'createdAt': Timestamp.now(),
         });
+
+        // Mark invitation code as used
+        await _db
+            .collection('invitationCodes')
+            .doc(snapshot.docs[0]
+                .id) // Get the document ID of the matched invitation code
+            .update({'used': true});
 
         // If "Create Group" option is selected
         if (createGroup) {
@@ -192,7 +239,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
           MaterialPageRoute(
             builder: (context) => AdminDashboard(
               isAdmin: true,
-              groupName: createGroup ? _groupNameController.text.trim() : 'Admin Group',
+              groupName: createGroup
+                  ? _groupNameController.text.trim()
+                  : 'Admin Group',
               isAdminView: true,
             ),
           ),
@@ -206,11 +255,14 @@ class _RegistrationPageState extends State<RegistrationPage> {
     }
   }
 
-  Future<void> _createGroup(String adminId, String name, String phone, String email) async {
+  Future<void> _createGroup(
+      String adminId, String name, String phone, String email) async {
     String groupName = _groupNameController.text.trim();
     double seedMoney = double.tryParse(_seedMoneyController.text.trim()) ?? 0.0;
-    double interestRate = double.tryParse(_interestRateController.text.trim()) ?? 0.0;
-    double monthlyContribution = double.tryParse(_monthlyContributionController.text.trim()) ?? 0.0;
+    double interestRate =
+        double.tryParse(_interestRateController.text.trim()) ?? 0.0;
+    double monthlyContribution =
+        double.tryParse(_monthlyContributionController.text.trim()) ?? 0.0;
 
     // Create the group and get the group ID
     DocumentReference groupRef = await _db.collection('groups').add({
@@ -224,14 +276,17 @@ class _RegistrationPageState extends State<RegistrationPage> {
 
     // Add the admin as a member of the group using the 'members' array in the same document
     await groupRef.update({
-      'members': FieldValue.arrayUnion([{
-        'userId': adminId,
-        'name': name,
-        'contact': phone,
-        'email': email,
-        'role': 'admin',  // Mark the role as 'admin'
-        'profilePicture': 'account_circle',  // Use Material icon for the profile picture
-      }]),
+      'members': FieldValue.arrayUnion([
+        {
+          'userId': adminId,
+          'name': name,
+          'contact': phone,
+          'email': email,
+          'role': 'admin', // Mark the role as 'admin'
+          'profilePicture':
+              'account_circle', // Use Material icon for the profile picture
+        }
+      ]),
     });
   }
 

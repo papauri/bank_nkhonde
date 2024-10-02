@@ -23,7 +23,6 @@ class AdminDashboard extends StatefulWidget {
 
 class _AdminDashboardState extends State<AdminDashboard> {
   bool isAdminView = true;
-  String currentGroupId = '';
   String userName = 'Admin';
 
   @override
@@ -57,7 +56,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       onWillPop: () async => false, // Disable back button
       child: Scaffold(
         appBar: AppBar(
-          title: Text('Admin Dashboard'),
+          title: Text(isAdminView ? 'Admin Dashboard' : 'User Dashboard'),
           centerTitle: true,
           backgroundColor: Colors.white,
           elevation: 1,
@@ -65,9 +64,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ),
         body: RefreshIndicator(
           onRefresh: _refreshGroups,
-          child: isAdminView ? _buildAdminBody() : UserDashboard(),
+          child: isAdminView
+              ? _buildAdminBody()
+              : UserDashboard(isAdmin: widget.isAdmin), // Pass isAdmin to UserDashboard
         ),
-        bottomNavigationBar: _buildBottomNavigationBar(),
+        bottomNavigationBar: isAdminView
+            ? _buildBottomNavigationBar() // Only show Admin BottomNavigationBar in admin view
+            : null, // Remove BottomNavigationBar when in user view
       ),
     );
   }
@@ -88,7 +91,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Widget _buildHeaderSection() {
     return Container(
       padding: EdgeInsets.symmetric(vertical: 30, horizontal: 20),
-      // Removed the explicit background color to let it blend into the background
       child: Column(
         children: [
           Icon(
@@ -193,11 +195,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ),
         trailing: Icon(Icons.arrow_forward_ios, color: Colors.black),
         onTap: () {
-          setState(() {
-            currentGroupId = groupId;
-          });
           _showGroupOverview(context, groupId, groupName);
         },
+      ),
+    );
+  }
+
+  void _showGroupOverview(BuildContext context, String groupId, String groupName) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => GroupOverviewPage(groupId: groupId, groupName: groupName),
       ),
     );
   }
@@ -215,10 +223,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
           label: isAdminView ? 'User View' : 'Admin View',
         ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.group_add),
-          label: 'Create Group',
-        ),
+        if (isAdminView) // Create Group button only appears in admin view
+          BottomNavigationBarItem(
+            icon: Icon(Icons.group_add),
+            label: 'Create Group',
+          ),
       ],
       onTap: (index) {
         switch (index) {
@@ -230,30 +239,41 @@ class _AdminDashboardState extends State<AdminDashboard> {
             );
             break;
           case 1:
-            setState(() {
-              isAdminView = !isAdminView;
-            });
+            if (isAdminView) {
+              // Switching from Admin to User View
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => UserDashboard(isAdmin: true),
+                ),
+              );
+            } else {
+              // Switching from User to Admin View
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AdminDashboard(
+                    isAdmin: true,
+                    groupName: widget.groupName,
+                    isAdminView: true,
+                  ),
+                ),
+              );
+            }
             break;
           case 2:
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => GroupCreationPage()),
-            );
+            if (isAdminView) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => GroupCreationPage()),
+              );
+            }
             break;
         }
       },
       selectedItemColor: Colors.black,
       unselectedItemColor: Colors.grey,
       backgroundColor: Colors.white,
-    );
-  }
-
-  void _showGroupOverview(BuildContext context, String groupId, String groupName) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => GroupOverviewPage(groupId: groupId, groupName: groupName),
-      ),
     );
   }
 }

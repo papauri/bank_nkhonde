@@ -3,7 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart'; // For charts
 import 'financial_card.dart';
 import 'member_list_tile.dart';
-import 'payment_details_page.dart'; // Import the new payment details page
+import 'payment_details_page.dart'; // Import the payment details page
+import 'payment_page.dart'; // Import the new payment page
 
 class GroupDetailsPage extends StatefulWidget {
   final String groupId;
@@ -73,7 +74,6 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   @override
   Widget build(BuildContext context) {
     final Color primaryColor = Colors.blueGrey[800]!;
-    final Color accentColor = Colors.blueGrey[50]!;
 
     return Scaffold(
       appBar: AppBar(
@@ -101,6 +101,11 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
 
           // Apply for Loan Button
           _buildApplyForLoanButton(primaryColor),
+
+          SizedBox(height: 16), // Adjusted spacing
+
+          // Payment Button
+          _buildPaymentButton(primaryColor),  // Payment button added here
 
           SizedBox(height: 32),
 
@@ -230,6 +235,15 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     );
   }
 
+  void _navigateToPaymentPage(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PaymentPage(groupId: widget.groupId),  // Navigate to the payment page
+      ),
+    );
+  }
+
   Widget _buildApplyForLoanButton(Color primaryColor) {
     return ElevatedButton(
       onPressed: () {
@@ -242,6 +256,24 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       ),
       child: Text(
         'Apply for Loan',
+        style: TextStyle(fontSize: 18, color: Colors.white),
+      ),
+    );
+  }
+
+  Widget _buildPaymentButton(Color primaryColor) {
+    return ElevatedButton(
+      onPressed: () {
+        // Navigate to PaymentPage
+        _navigateToPaymentPage(context);
+      },
+      style: ElevatedButton.styleFrom(
+        backgroundColor: primaryColor,
+        padding: EdgeInsets.symmetric(vertical: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      child: Text(
+        'Make a Payment',
         style: TextStyle(fontSize: 18, color: Colors.white),
       ),
     );

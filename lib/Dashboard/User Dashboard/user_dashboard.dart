@@ -2,11 +2,16 @@ import 'package:bank_nkhonde/Login%20Page/login_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../Admin Dashboard/admin_dashboard.dart';
 import 'profile_section.dart';
 import 'group_section.dart';
 import 'my_groups_tab.dart';  // Import MyGroupsTab
 
 class UserDashboard extends StatefulWidget {
+  final bool isAdmin; // Track if the user is an admin
+
+  UserDashboard({this.isAdmin = false}); // Default is false
+
   @override
   _UserDashboardState createState() => _UserDashboardState();
 }
@@ -47,7 +52,7 @@ class _UserDashboardState extends State<UserDashboard> {
         },
         child: _buildBody(),
       ),
-      bottomNavigationBar: _buildBottomNavigationBar(),
+      bottomNavigationBar: _buildBottomNavigationBar(), // Single bottom navigation bar
     );
   }
 
@@ -121,52 +126,49 @@ class _UserDashboardState extends State<UserDashboard> {
     }
   }
 
-// Inside your _buildProfileAndWelcomeSection
-
-Widget _buildProfileAndWelcomeSection() {
-  return FutureBuilder<DocumentSnapshot>(
-    future: FirebaseFirestore.instance.collection('users').doc(currentUserId).get(),
-    builder: (context, snapshot) {
-      String userName = 'User';
-      String? profilePictureUrl;
-      if (snapshot.hasData && snapshot.data!.exists) {
-        userName = snapshot.data!.get('name') ?? 'User';
-        profilePictureUrl = snapshot.data!.get('profilePicture');
-      }
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          ProfileSection(profilePictureUrl: profilePictureUrl),  // Pass profile picture URL
-          SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Hello, $userName!',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+  Widget _buildProfileAndWelcomeSection() {
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance.collection('users').doc(currentUserId).get(),
+      builder: (context, snapshot) {
+        String userName = 'User';
+        String? profilePictureUrl;
+        if (snapshot.hasData && snapshot.data!.exists) {
+          userName = snapshot.data!.get('name') ?? 'User';
+          profilePictureUrl = snapshot.data!.get('profilePicture');
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            ProfileSection(profilePictureUrl: profilePictureUrl),  // Pass profile picture URL
+            SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Hello, $userName!',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
                   ),
-                ),
-                SizedBox(height: 6),
-                Text(
-                  'Explore the groups you’re part of below.',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[600],
+                  SizedBox(height: 6),
+                  Text(
+                    'Explore the groups you’re part of below.',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
-      );
-    },
-  );
-}
-
+          ],
+        );
+      },
+    );
+  }
 
   Widget _buildGroupsExplanation() {
     return Column(
@@ -196,35 +198,71 @@ Widget _buildProfileAndWelcomeSection() {
     return GroupSection(currentUserId: currentUserId);  // The main groups display
   }
 
-  // Bottom Navigation Bar for Quick Actions
-  BottomNavigationBar _buildBottomNavigationBar() {
-    return BottomNavigationBar(
-      type: BottomNavigationBarType.fixed,  // Ensure labels are always visible
-      items: const <BottomNavigationBarItem>[
-        BottomNavigationBarItem(
-          icon: Icon(Icons.group),
-          label: 'My Groups',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.message),
-          label: 'Group Chat',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.notifications),
-          label: 'Notifications',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.logout),
-          label: 'Logout',
-        ),
-      ],
-      currentIndex: _selectedIndex,
-      selectedItemColor: Colors.blue,  // Highlight only selected tab
-      unselectedItemColor: Colors.grey,  // Grey out unselected items
-      showUnselectedLabels: true,  // Ensure all labels are visible even when not selected
-      onTap: _onItemTapped,
-    );
-  }
-  
-}
+// Bottom Navigation Bar for Quick Actions
+BottomNavigationBar _buildBottomNavigationBar() {
+  List<BottomNavigationBarItem> items = [
+    BottomNavigationBarItem(
+      icon: Icon(Icons.group),
+      label: 'My Groups',
+    ),
+    BottomNavigationBarItem(
+      icon: Icon(Icons.message),
+      label: 'Group Chat',
+    ),
+    BottomNavigationBarItem(
+      icon: Icon(Icons.notifications),
+      label: 'Notifications',
+    ),
+  ];
 
+  // Add Admin View between Group Chat and Notifications if the user is an admin
+  if (widget.isAdmin) {
+    items.insert(2, BottomNavigationBarItem(
+      icon: Icon(Icons.admin_panel_settings),
+      label: 'Admin View',
+    ));
+  }
+
+  // Add Logout as the last item
+  items.add(
+    BottomNavigationBarItem(
+      icon: Icon(Icons.logout),
+      label: 'Logout',
+    ),
+  );
+
+  return BottomNavigationBar(
+    type: BottomNavigationBarType.fixed,  // Ensure labels are always visible
+    items: items,
+    currentIndex: _selectedIndex,
+    selectedItemColor: Colors.blue,  // Highlight only selected tab
+    unselectedItemColor: Colors.grey,  // Grey out unselected items
+    showUnselectedLabels: true,  // Ensure all labels are visible even when not selected
+    onTap: (index) {
+      // Handle Logout and Switch to Admin View
+      if (index == items.length - 1) { // Logout is always the last item
+        FirebaseAuth.instance.signOut();
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => LoginPage()),
+        );
+      } else if (index == 2 && widget.isAdmin) {
+        // Switch back to Admin View
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AdminDashboard(
+              isAdmin: true, 
+              groupName: '', 
+              isAdminView: true,  // Ensure the admin view is passed
+            ),
+          ),
+        );  // Navigate back to the Admin Dashboard with pushReplacement
+      } else {
+        setState(() {
+          _selectedIndex = index;
+        });
+      }
+    },
+  );
+}
+}

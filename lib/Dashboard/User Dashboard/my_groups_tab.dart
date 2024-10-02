@@ -89,18 +89,20 @@ class _MyGroupsTabState extends State<MyGroupsTab> {
   }
 
   // Fetch Firebase Storage URL if not already available
-  Future<String> _getProfilePictureUrl(String? profilePictureField, String userId) async {
+  Future<String?> _getProfilePictureUrl(String? profilePictureField, String userId) async {
     if (profilePictureField != null && profilePictureField.isNotEmpty) {
+      print('Profile picture URL found in Firestore: $profilePictureField');
       return profilePictureField; // If the URL is already stored in Firestore
     } else {
       // If not, fetch from Firebase Storage
       try {
         Reference storageRef = FirebaseStorage.instance.ref().child('profilePictures/$userId.jpg');
         String url = await storageRef.getDownloadURL();
+        print('Profile picture fetched from Firebase Storage: $url');
         return url; // Return the download URL
       } catch (e) {
         print('Error fetching image from Firebase Storage: $e');
-        return ''; // Return empty if there's an issue
+        return null; // Return null if there's an issue
       }
     }
   }
@@ -113,11 +115,20 @@ class _MyGroupsTabState extends State<MyGroupsTab> {
         final memberProfilePicture = member['profilePicture']; // Field in Firestore
         final memberId = member['userId']; // The user ID is assumed to be stored
 
-        return FutureBuilder<String>(
+        return FutureBuilder<String?>(
           future: _getProfilePictureUrl(memberProfilePicture, memberId),  // Get the picture URL
           builder: (context, snapshot) {
-            if (!snapshot.hasData || snapshot.data == '') {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              // Show a loading indicator while fetching the image
+              return ListTile(
+                leading: CircleAvatar(
+                  child: CircularProgressIndicator(),
+                ),
+                title: Text(memberName),
+              );
+            } else if (snapshot.hasError || !snapshot.hasData || snapshot.data == null || snapshot.data!.isEmpty) {
               // If no image, return a default icon
+              print('Error or no profile picture URL found for member: $memberName');
               return ListTile(
                 leading: CircleAvatar(
                   child: Icon(Icons.person, size: 30),
@@ -126,6 +137,7 @@ class _MyGroupsTabState extends State<MyGroupsTab> {
               );
             } else {
               // Return the NetworkImage if the URL is valid
+              print('Displaying profile picture for $memberName');
               return ListTile(
                 leading: CircleAvatar(
                   backgroundImage: NetworkImage(snapshot.data!), // Load the profile picture from Firebase Storage
