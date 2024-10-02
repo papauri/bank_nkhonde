@@ -21,11 +21,6 @@ class _UserDashboardState extends State<UserDashboard> {
   int _selectedIndex = 0;
 
   // Track the selected tab index and dynamically render content below the dashboard
-  static const List<String> _tabTitles = <String>[
-    'My Groups',
-    'Group Chat',
-    'Notifications',
-  ];
 
   // Handle tab selection
   void _onItemTapped(int index) {

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
 import '../Payment Management/PendingLoansPage.dart';
 import '../Payment Management/contributions_overview_page.dart';
 import '../Payment Management/loan_management_page.dart';
@@ -103,7 +102,6 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
 
   @override
   Widget build(BuildContext context) {
-    final numberFormat = NumberFormat.currency(locale: 'en_US', symbol: 'MWK ');
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.groupName),
