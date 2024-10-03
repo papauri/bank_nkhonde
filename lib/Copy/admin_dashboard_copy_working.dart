@@ -1,5 +1,5 @@
-import 'package:bank_nkhonde/Group%20Management/GroupOverviewPage.dart';
-import 'package:bank_nkhonde/Group%20Management/group_creation.dart';
+import 'package:bank_nkhonde/Dashboard/Admin%20Dashboard/Group%20Management/admin_group_overview.dart';
+import 'package:bank_nkhonde/Dashboard/Admin%20Dashboard/Group%20Management/admin_create_group.dart';
 import 'package:bank_nkhonde/Account%20Management/member_management_page.dart'; // Import the separated GroupMembersPage
 import 'package:bank_nkhonde/Dashboard/User%20Dashboard/user_dashboard.dart';
 import 'package:bank_nkhonde/Login%20Page/login_page.dart';

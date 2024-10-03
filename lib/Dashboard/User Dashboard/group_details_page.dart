@@ -3,8 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart'; // For charts
 import 'financial_card.dart';
 import 'member_list_tile.dart';
-import 'payment_details_page.dart'; // Import the payment details page
-import 'payment_page.dart'; // Import the new payment page
+import 'user_payment_details_page.dart'; // Import the payment details page
+import 'user_payment_page.dart'; // Import the new payment page
 
 class GroupDetailsPage extends StatefulWidget {
   final String groupId;

@@ -1,4 +1,4 @@
-import 'package:bank_nkhonde/Dashboard/User%20Dashboard/payment_page.dart';
+import 'package:bank_nkhonde/Dashboard/User%20Dashboard/user_payment_page.dart';
 import 'package:flutter/material.dart';
 
 class FinancialOverview extends StatelessWidget {
