@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
-import 'user_submit_payment_logic.dart';
+import '../Dashboard/User Dashboard/user_submit_payment_logic.dart';
 
 class PaymentPage extends StatefulWidget {
   final String groupId;
@@ -16,8 +16,7 @@ class PaymentPage extends StatefulWidget {
 
 class _PaymentPageState extends State<PaymentPage> {
   final TextEditingController _amountController = TextEditingController();
-  final TextEditingController _transactionReferenceController =
-      TextEditingController();
+  final TextEditingController _transactionReferenceController = TextEditingController();
   String? selectedPaymentType = 'Monthly Contribution';
   String? payerName = 'Unknown User';
   String? selectedMonth;
@@ -62,8 +61,7 @@ class _PaymentPageState extends State<PaymentPage> {
   }
 
   Future<void> _pickScreenshot() async {
-    final pickedFile =
-        await ImagePicker().pickImage(source: ImageSource.gallery);
+    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
       setState(() {
         _screenshotFile = File(pickedFile.path);
@@ -72,30 +70,8 @@ class _PaymentPageState extends State<PaymentPage> {
   }
 
   Future<void> _submitPayment() async {
-    double? amount = double.tryParse(_amountController.text.trim());
+    double amount = double.tryParse(_amountController.text.trim()) ?? 0.0;
     String transactionReference = _transactionReferenceController.text.trim();
-
-    // Check if all mandatory fields are filled
-    if (amount == null || amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please enter a valid amount')),
-      );
-      return;
-    }
-
-    if (transactionReference.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please enter a transaction reference')),
-      );
-      return;
-    }
-
-    if (_screenshotFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please upload a screenshot of the payment')),
-      );
-      return;
-    }
 
     try {
       final submitLogic = SubmitPaymentLogic(
@@ -108,14 +84,13 @@ class _PaymentPageState extends State<PaymentPage> {
         screenshot: _screenshotFile,
       );
       await submitLogic.submitPayment();
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Payment submitted successfully!')),
       );
       Navigator.pop(context);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to submit payment. Please try again.')),
+        SnackBar(content: Text(e.toString())),
       );
     }
   }
@@ -153,8 +128,7 @@ class _PaymentPageState extends State<PaymentPage> {
         ),
         SizedBox(height: 8),
         if (fixedMonthlyAmount != null) ...[
-          Text(
-              'Fixed Monthly Contribution: MWK ${fixedMonthlyAmount!.toStringAsFixed(2)}'),
+          Text('Fixed Monthly Contribution: MWK ${fixedMonthlyAmount!.toStringAsFixed(2)}'),
           TextButton(
             onPressed: () {
               setState(() {
@@ -179,9 +153,7 @@ class _PaymentPageState extends State<PaymentPage> {
     return OutlinedButton.icon(
       onPressed: _pickScreenshot,
       icon: Icon(Icons.image),
-      label: Text(_screenshotFile == null
-          ? 'Upload Proof of Payment Screenshot'
-          : 'Screenshot Selected'),
+      label: Text(_screenshotFile == null ? 'Upload Proof of Payment Screenshot' : 'Screenshot Selected'),
     );
   }
 
