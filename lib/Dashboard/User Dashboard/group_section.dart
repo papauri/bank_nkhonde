@@ -32,7 +32,7 @@ class GroupSection extends StatelessWidget {
 
         return ListView.builder(
           shrinkWrap: true,
-          physics: BouncingScrollPhysics(),  // Smooth scrolling
+          physics: BouncingScrollPhysics(), // Smooth scrolling
           itemCount: groups.length,
           itemBuilder: (context, index) {
             final group = groups[index];
@@ -41,22 +41,29 @@ class GroupSection extends StatelessWidget {
             final fixedAmount = group['fixedAmount'];
             final seedMoney = group['seedMoney'];
 
-            return _buildGroupCard(context, groupId, groupName, fixedAmount, seedMoney);
+            return _buildGroupCard(
+                context, groupId, groupName, fixedAmount, seedMoney);
           },
         );
       },
     );
   }
 
-  Widget _buildGroupCard(BuildContext context, String groupId, String groupName, dynamic fixedAmount, dynamic seedMoney) {
+  Widget _buildGroupCard(BuildContext context, String groupId, String groupName,
+      dynamic fixedAmount, dynamic seedMoney) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),  // Adequate padding
+      padding: const EdgeInsets.symmetric(
+          vertical: 8.0, horizontal: 16.0), // Adequate padding
       child: GestureDetector(
         onTap: () {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => GroupDetailsPage(groupId: groupId, groupName: groupName),
+              builder: (context) => GroupDetailsPage(
+                groupId: groupId,
+                groupName: groupName,
+                userId: currentUserId!, // Pass userId here
+              ),
             ),
           );
         },
@@ -83,7 +90,7 @@ class GroupSection extends StatelessWidget {
                     Icon(
                       Icons.group,
                       size: 32,
-                      color: Colors.blueGrey,  // Group icon for visual aid
+                      color: Colors.blueGrey, // Group icon for visual aid
                     ),
                     SizedBox(width: 10),
                     Expanded(
@@ -95,7 +102,8 @@ class GroupSection extends StatelessWidget {
                           color: Colors.black87,
                         ),
                         maxLines: 2,
-                        overflow: TextOverflow.ellipsis,  // Prevents overflow with long names
+                        overflow: TextOverflow
+                            .ellipsis, // Prevents overflow with long names
                       ),
                     ),
                   ],
@@ -136,7 +144,8 @@ class GroupSection extends StatelessWidget {
         ),
         Text(
           value,
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
+          style: TextStyle(
+              fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
         ),
       ],
     );

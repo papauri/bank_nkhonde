@@ -30,7 +30,8 @@ class _PaymentBreakdownPageState extends State<PaymentBreakdownPage> {
               .collection('groups')
               .doc(widget.groupId)
               .collection('payments')
-              .where('status', isEqualTo: 'confirmed') // Only confirmed payments
+              .where('status', isEqualTo: 'confirmed')
+              .where('paymentType', isEqualTo: 'Monthly Contribution') // Only monthly contributions
               .orderBy('paymentDate', descending: true)
               .snapshots(),
           builder: (context, snapshot) {
@@ -41,23 +42,20 @@ class _PaymentBreakdownPageState extends State<PaymentBreakdownPage> {
             final payments = snapshot.data!.docs;
             if (payments.isEmpty) {
               return Center(
-                child: Text('No confirmed payments found.'),
+                child: Text('No confirmed monthly contributions found.'),
               );
             }
 
-            // Group payments by year, then by month, then by user
-            Map<String, Map<String, Map<String, List<QueryDocumentSnapshot>>>> groupedPayments = {};
-
+            // Group payments by year, then by month
+            Map<String, Map<String, List<QueryDocumentSnapshot>>> groupedPayments = {};
             for (var payment in payments) {
               final paymentDate = (payment['paymentDate'] as Timestamp).toDate();
               String year = DateFormat('yyyy').format(paymentDate);
               String month = DateFormat('MMMM').format(paymentDate);
-              String payerName = payment['payerName'];
 
               groupedPayments[year] = groupedPayments[year] ?? {};
-              groupedPayments[year]![month] = groupedPayments[year]![month] ?? {};
-              groupedPayments[year]![month]![payerName] = groupedPayments[year]![month]![payerName] ?? [];
-              groupedPayments[year]![month]![payerName]!.add(payment);
+              groupedPayments[year]![month] = groupedPayments[year]![month] ?? [];
+              groupedPayments[year]![month]!.add(payment);
             }
 
             return ListView(
@@ -72,11 +70,10 @@ class _PaymentBreakdownPageState extends State<PaymentBreakdownPage> {
     );
   }
 
-  Widget _buildYearSection(String year, Map<String, Map<String, List<QueryDocumentSnapshot>>> paymentsByMonth) {
+  Widget _buildYearSection(String year, Map<String, List<QueryDocumentSnapshot>> paymentsByMonth) {
     return Card(
       margin: EdgeInsets.symmetric(vertical: 8),
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 3,
       child: ExpansionTile(
         title: Text(
           year,
@@ -89,68 +86,28 @@ class _PaymentBreakdownPageState extends State<PaymentBreakdownPage> {
     );
   }
 
-  Widget _buildMonthSection(String month, Map<String, List<QueryDocumentSnapshot>> paymentsByUser) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          color: Colors.teal[50],
-          child: Text(
-            month,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
-          ),
-        ),
-        ...paymentsByUser.entries.map((userEntry) {
-          String payerName = userEntry.key;
-          double totalForUser = userEntry.value.fold(
-              0.0, (sum, payment) => sum + (payment['amount']?.toDouble() ?? 0.0));
-
-          return _buildUserSection(payerName, totalForUser, userEntry.value);
-        }).toList(),
-      ],
-    );
-  }
-
-  Widget _buildUserSection(String payerName, double totalForUser, List<QueryDocumentSnapshot> payments) {
+  Widget _buildMonthSection(String month, List<QueryDocumentSnapshot> payments) {
+    double totalAmount = payments.fold(0.0, (sum, payment) => sum + (payment['amount']?.toDouble() ?? 0.0));
     return ExpansionTile(
       title: Text(
-        '$payerName - Total: MWK ${totalForUser.toStringAsFixed(2)}',
+        '$month - Total: MWK ${totalAmount.toStringAsFixed(2)}',
         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
       ),
       children: payments.map((payment) {
+        String paymentDateFormatted = DateFormat('dd MMM yyyy').format((payment['paymentDate'] as Timestamp).toDate());
         return ListTile(
-          leading: Icon(
-            Icons.check_circle,
-            color: Colors.green,
-          ),
+          leading: Icon(Icons.check_circle, color: Colors.green),
           title: Text('MWK ${payment['amount']}'),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Payment Date: ${_formatDate(payment['paymentDate'])}'),
-              if (payment['transactionReference'] != null)
-                Text('Reference: ${payment['transactionReference']}'),
-              if (payment['screenshotUrl'] != null)
-                GestureDetector(
-                  onTap: () {
-                    _showImageDialog(context, payment['screenshotUrl']);
-                  },
-                  child: Text(
-                    'View Screenshot',
-                    style: TextStyle(color: Colors.blue),
-                  ),
-                ),
-            ],
-          ),
+          subtitle: Text('Date: $paymentDateFormatted\nReference: ${payment['transactionReference'] ?? 'N/A'}'),
+          trailing: payment['screenshotUrl'] != null
+              ? IconButton(
+                  icon: Icon(Icons.image, color: Colors.blue),
+                  onPressed: () => _showImageDialog(context, payment['screenshotUrl']),
+                )
+              : null,
         );
       }).toList(),
     );
-  }
-
-  String _formatDate(Timestamp timestamp) {
-    DateTime date = timestamp.toDate();
-    return DateFormat('EEEE, MMM d, yyyy').format(date);
   }
 
   void _showImageDialog(BuildContext context, String imageUrl) {
@@ -158,8 +115,8 @@ class _PaymentBreakdownPageState extends State<PaymentBreakdownPage> {
       context: context,
       builder: (BuildContext context) {
         return Dialog(
-          child: Container(
-            padding: EdgeInsets.all(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
             child: Image.network(imageUrl),
           ),
         );

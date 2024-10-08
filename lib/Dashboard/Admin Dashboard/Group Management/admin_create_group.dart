@@ -35,6 +35,7 @@ class _GroupCreationPageState extends State<GroupCreationPage> {
         'fixedAmount': double.parse(fixedAmount),  // Adding fixed amount
         'admin': FirebaseAuth.instance.currentUser!.uid,
         'members': [], // Group starts with no members
+        'totalContributions': 0.0, // Initialize total contributions
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -54,6 +55,7 @@ class _GroupCreationPageState extends State<GroupCreationPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Create a New Group'),
+        backgroundColor: Colors.teal[800], // Adding a background color for styling
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

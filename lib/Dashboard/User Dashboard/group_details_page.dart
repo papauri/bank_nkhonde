@@ -1,36 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:fl_chart/fl_chart.dart'; // For charts
-import 'financial_card.dart';
 import 'member_list_tile.dart';
-import 'user_payment_details_page.dart'; // Import the payment details page
 import 'user_payment_page.dart'; // Import the new payment page
+import 'user_payment_details_page.dart'; // Import for navigating to payment details
+import 'seed_money_payment_page.dart'; // Import the Seed Money Payment Page
 
 class GroupDetailsPage extends StatefulWidget {
   final String groupId;
   final String groupName;
+  final String userId; // Add userId for fetching only this user's data
 
-  GroupDetailsPage({required this.groupId, required this.groupName});
+  GroupDetailsPage({required this.groupId, required this.groupName, required this.userId});
 
   @override
   _GroupDetailsPageState createState() => _GroupDetailsPageState();
 }
 
 class _GroupDetailsPageState extends State<GroupDetailsPage> {
-  double totalContribution = 0.0;
-  double outstandingLoans = 0.0;
-  double availableFunds = 0.0;
+  double amountOwedForMonth = 0.0;
+  double amountPaidForMonth = 0.0; // New field for amount paid
+  double fixedAmount = 0.0; // Group's default fixed amount
+  double seedMoneyAmount = 0.0; // Seed money for the group
+  double seedMoneyPaid = 0.0; // Seed money paid by the user
   List<Map<String, dynamic>> members = [];
+  double pendingPayments = 0.0; // Field for pending payments
 
   @override
   void initState() {
     super.initState();
     _fetchGroupData();
-    _fetchTotalConfirmedContributions();
+    _fetchUserFinancialData(); // Fetch user-specific financial data
   }
 
   Future<void> _fetchGroupData() async {
     try {
+      // Fetch the group's details, including fixedAmount for contributions
       DocumentSnapshot groupDoc = await FirebaseFirestore.instance
           .collection('groups')
           .doc(widget.groupId)
@@ -39,8 +43,8 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       if (groupDoc.exists) {
         var data = groupDoc.data() as Map<String, dynamic>;
         setState(() {
-          outstandingLoans = (data['outstandingLoans'] ?? 0).toDouble();
-          availableFunds = (data['availableFunds'] ?? 0).toDouble();
+          fixedAmount = (data['fixedAmount'] ?? 0.0).toDouble(); // Fetch the fixedAmount from Firestore
+          seedMoneyAmount = (data['seedMoney'] ?? 0.0).toDouble(); // Fetch the seedMoney from Firestore
           members = List<Map<String, dynamic>>.from(data['members'] ?? []);
         });
       }
@@ -49,25 +53,53 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     }
   }
 
-  Future<void> _fetchTotalConfirmedContributions() async {
+  Future<void> _fetchUserFinancialData() async {
     try {
-      QuerySnapshot paymentSnapshot = await FirebaseFirestore.instance
+      // Fetch confirmed payments (amount paid by the user)
+      QuerySnapshot confirmedPaymentsSnapshot = await FirebaseFirestore.instance
           .collection('groups')
           .doc(widget.groupId)
           .collection('payments')
-          .where('status', whereIn: ['confirmed', 'pending'])  // Fetch both confirmed and pending
+          .where('userId', isEqualTo: widget.userId) // Only fetch this user's payments
+          .where('status', isEqualTo: 'confirmed') // Only fetch confirmed payments
           .get();
 
-      double totalContributions = 0.0;
-      for (var doc in paymentSnapshot.docs) {
-        totalContributions += (doc['amount'] as num).toDouble();
+      double totalPaid = 0.0;
+      double totalSeedPaid = 0.0;
+      for (var doc in confirmedPaymentsSnapshot.docs) {
+        if (doc['paymentType'] == 'Seed Money') {
+          totalSeedPaid += (doc['amount'] as num).toDouble();
+        } else {
+          totalPaid += (doc['amount'] as num).toDouble();
+        }
       }
 
+      // Fetch pending payments (amount not yet confirmed)
+      QuerySnapshot pendingPaymentsSnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .collection('payments')
+          .where('userId', isEqualTo: widget.userId)
+          .where('status', isEqualTo: 'pending') // Only fetch pending payments
+          .get();
+
+      double totalPending = 0.0;
+      for (var doc in pendingPaymentsSnapshot.docs) {
+        totalPending += (doc['amount'] as num).toDouble();
+      }
+
+      // Calculate amount owed as the default fixed amount minus confirmed amount paid
+      double totalOwed = fixedAmount - totalPaid;
+      if (totalOwed < 0) totalOwed = 0.0; // Ensure no negative values for owed amount
+
       setState(() {
-        totalContribution = totalContributions;
+        amountPaidForMonth = totalPaid;
+        amountOwedForMonth = totalOwed;
+        pendingPayments = totalPending;
+        seedMoneyPaid = totalSeedPaid;
       });
     } catch (e) {
-      print('Error fetching confirmed contributions: $e');
+      print('Error fetching user financial data: $e');
     }
   }
 
@@ -77,169 +109,219 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.groupName),
-        backgroundColor: primaryColor,
+        title: Text(
+          widget.groupName,
+          style: TextStyle(color: Colors.black),
+        ),
+        backgroundColor: Colors.white,
         elevation: 0,
+        iconTheme: IconThemeData(color: Colors.black), // Ensure icons match the theme
       ),
-      body: ListView(
-        padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-        children: [
-          // Financial Overview Section
-          Text(
-            'Financial Overview',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await _fetchGroupData();
+          await _fetchUserFinancialData();
+        },
+        child: ListView(
+          padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+          children: [
+            // Financial Overview Section
+            Text(
+              'Financial Overview',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 16),
+            _buildMonthlyFinancialOverview(), // Updated financial overview
+            SizedBox(height: 16),
+            _buildSeedMoneyOverview(), // Seed money overview tile
+
+            if (pendingPayments > 0) ...[
+              SizedBox(height: 16),
+              _buildPendingPaymentsTile(),
+            ],
+
+            SizedBox(height: 32),
+
+            // Apply for Loan Button
+            _buildApplyForLoanButton(primaryColor),
+
+            SizedBox(height: 16), // Adjusted spacing
+
+            // Payment Button
+            _buildPaymentButton(primaryColor), // Payment button added here
+
+            SizedBox(height: 32),
+
+            // Members Section
+            Text(
+              'Group Members',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 16),
+            _buildMembersList(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMonthlyFinancialOverview() {
+    return GestureDetector(
+      onTap: () {
+        // Navigate to user payment details page
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PaymentDetailsPage(groupId: widget.groupId, userId: widget.userId),
           ),
-          SizedBox(height: 16),
-          _buildFinancialOverview(),
+        );
+      },
+      child: Container(
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.3),
+              spreadRadius: 2,
+              blurRadius: 8,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Amount Owed for the Month',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'MWK ${amountOwedForMonth.toStringAsFixed(2)}',
+                  style: TextStyle(fontSize: 18, color: Colors.orange),
+                ),
+              ],
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  'Amount Paid',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'MWK ${amountPaidForMonth.toStringAsFixed(2)}',
+                  style: TextStyle(fontSize: 18, color: Colors.green),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-          SizedBox(height: 32),
-
-          // Bar Chart Section
-          _buildFinancialBarChart(),  // Updated with correct interactivity
-
-          SizedBox(height: 32),
-
-          // Apply for Loan Button
-          _buildApplyForLoanButton(primaryColor),
-
-          SizedBox(height: 16), // Adjusted spacing
-
-          // Payment Button
-          _buildPaymentButton(primaryColor),  // Payment button added here
-
-          SizedBox(height: 32),
-
-          // Members Section
-          Text(
-            'Group Members',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+  Widget _buildSeedMoneyOverview() {
+    double seedMoneyBalance = seedMoneyAmount - seedMoneyPaid;
+    return GestureDetector(
+      onTap: () {
+        // Navigate to Seed Money Payment Page
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SeedMoneyPaymentPage(groupId: widget.groupId),
           ),
-          SizedBox(height: 16),
-          _buildMembersList(),
+        );
+      },
+      child: Container(
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.3),
+              spreadRadius: 2,
+              blurRadius: 8,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Seed Money Payment',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'MWK ${seedMoneyPaid.toStringAsFixed(2)}',
+                  style: TextStyle(fontSize: 18, color: Colors.green),
+                ),
+              ],
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  'Balance',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'MWK ${seedMoneyBalance.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: seedMoneyBalance > 0 ? Colors.red : Colors.green,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPendingPaymentsTile() {
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.3),
+            spreadRadius: 2,
+            blurRadius: 8,
+            offset: Offset(0, 3),
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _buildFinancialOverview() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        FinancialCard(
-          title: 'Contributions',
-          amount: totalContribution,
-          icon: Icons.attach_money,
-          color: Colors.green,
-        ),
-        FinancialCard(
-          title: 'Loans',
-          amount: outstandingLoans,
-          icon: Icons.money_off,
-          color: Colors.redAccent,
-        ),
-        FinancialCard(
-          title: 'Available',
-          amount: availableFunds,
-          icon: Icons.account_balance_wallet,
-          color: Colors.blueAccent,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFinancialBarChart() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Funds Distribution',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-        ),
-        SizedBox(height: 16),
-        AspectRatio(
-          aspectRatio: 1.5,
-          child: BarChart(
-            BarChartData(
-              alignment: BarChartAlignment.spaceAround,
-              barTouchData: BarTouchData(
-                touchTooltipData: BarTouchTooltipData(
-                  tooltipBgColor: Colors.grey,
-                ),
-                touchCallback: (FlTouchEvent event, barTouchResponse) {
-                  if (!event.isInterestedForInteractions ||
-                      barTouchResponse == null ||
-                      barTouchResponse.spot == null) {
-                    return;
-                  }
-
-                  final tappedGroupIndex = barTouchResponse.spot!.touchedBarGroupIndex;
-
-                  if (tappedGroupIndex == 0) {
-                    // Navigate to PaymentDetailsPage if contributions bar is tapped
-                    _navigateToPaymentDetails(context);
-                  }
-                },
-              ),
-              barGroups: [
-                _buildBarGroup(0, totalContribution, Colors.green, 'Contributions'),
-                _buildBarGroup(1, outstandingLoans, Colors.redAccent, 'Loans'),
-                _buildBarGroup(2, availableFunds, Colors.blueAccent, 'Available'),
-              ],
-              titlesData: FlTitlesData(
-                show: true,
-                bottomTitles: SideTitles(
-                  showTitles: true,
-                  getTitles: (double value) {
-                    switch (value.toInt()) {
-                      case 0:
-                        return 'Contributions';
-                      case 1:
-                        return 'Loans';
-                      case 2:
-                        return 'Available';
-                      default:
-                        return '';
-                    }
-                  },
-                ),
-                leftTitles: SideTitles(showTitles: true),
-              ),
-              borderData: FlBorderData(show: false),
-            ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Pending Payments',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
-        ),
-      ],
-    );
-  }
-
-  BarChartGroupData _buildBarGroup(int x, double y, Color color, String title) {
-    return BarChartGroupData(
-      x: x,
-      barRods: [
-        BarChartRodData(
-          y: y,
-          colors: [color],
-          width: 22,
-          borderRadius: BorderRadius.circular(6),
-        ),
-      ],
-    );
-  }
-
-  void _navigateToPaymentDetails(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PaymentDetailsPage(groupId: widget.groupId),  // Navigate to payment details
-      ),
-    );
-  }
-
-  void _navigateToPaymentPage(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PaymentPage(groupId: widget.groupId),  // Navigate to the payment page
+          SizedBox(height: 4),
+          Text(
+            'MWK ${pendingPayments.toStringAsFixed(2)}',
+            style: TextStyle(fontSize: 18, color: Colors.redAccent),
+          ),
+        ],
       ),
     );
   }
@@ -265,7 +347,12 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     return ElevatedButton(
       onPressed: () {
         // Navigate to PaymentPage
-        _navigateToPaymentPage(context);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PaymentPage(groupId: widget.groupId),
+          ),
+        );
       },
       style: ElevatedButton.styleFrom(
         backgroundColor: primaryColor,

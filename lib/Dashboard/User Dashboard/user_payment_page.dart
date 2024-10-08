@@ -16,19 +16,20 @@ class PaymentPage extends StatefulWidget {
 
 class _PaymentPageState extends State<PaymentPage> {
   final TextEditingController _amountController = TextEditingController();
-  final TextEditingController _transactionReferenceController =
-      TextEditingController();
+  final TextEditingController _transactionReferenceController = TextEditingController();
   String? selectedPaymentType = 'Monthly Contribution';
   String? payerName = 'Unknown User';
-  String? selectedMonth;
   File? _screenshotFile;
   double? fixedMonthlyAmount;
+  double? totalOwed;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
     _fetchUserName();
     _fetchGroupDetails();
+    _calculateTotalOwed();
   }
 
   Future<void> _fetchUserName() async {
@@ -61,9 +62,38 @@ class _PaymentPageState extends State<PaymentPage> {
     }
   }
 
+  Future<void> _calculateTotalOwed() async {
+    try {
+      String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
+
+      // Fetch confirmed payments for the current month only (amount paid by the user)
+      QuerySnapshot confirmedPaymentsSnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .collection('payments')
+          .where('userId', isEqualTo: currentUserId) // Only fetch this user's payments
+          .where('status', isEqualTo: 'confirmed') // Only fetch confirmed payments
+          .where('paymentType', isEqualTo: 'Monthly Contribution') // Only fetch monthly contributions
+          .get();
+
+      double totalPaid = 0.0;
+      for (var doc in confirmedPaymentsSnapshot.docs) {
+        totalPaid += (doc['amount'] as num).toDouble();
+      }
+
+      // Calculate total owed for monthly contribution
+      double totalOwed = fixedMonthlyAmount! - totalPaid;
+
+      setState(() {
+        this.totalOwed = totalOwed > 0 ? totalOwed : 0.0;
+      });
+    } catch (e) {
+      print('Error calculating total owed: $e');
+    }
+  }
+
   Future<void> _pickScreenshot() async {
-    final pickedFile =
-        await ImagePicker().pickImage(source: ImageSource.gallery);
+    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
       setState(() {
         _screenshotFile = File(pickedFile.path);
@@ -97,6 +127,10 @@ class _PaymentPageState extends State<PaymentPage> {
       return;
     }
 
+    setState(() {
+      _isSubmitting = true;
+    });
+
     try {
       final submitLogic = SubmitPaymentLogic(
         groupId: widget.groupId,
@@ -104,7 +138,6 @@ class _PaymentPageState extends State<PaymentPage> {
         selectedPaymentType: selectedPaymentType!,
         transactionReference: transactionReference,
         amount: amount,
-        selectedMonth: selectedMonth,
         screenshot: _screenshotFile,
       );
       await submitLogic.submitPayment();
@@ -117,6 +150,10 @@ class _PaymentPageState extends State<PaymentPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to submit payment. Please try again.')),
       );
+    } finally {
+      setState(() {
+        _isSubmitting = false;
+      });
     }
   }
 
@@ -126,11 +163,11 @@ class _PaymentPageState extends State<PaymentPage> {
       onChanged: (String? newValue) {
         setState(() {
           selectedPaymentType = newValue;
+          _calculateTotalOwed(); // Recalculate total owed based on selected payment type
         });
       },
       items: <String>[
         'Monthly Contribution',
-        'Loan Repayment',
         'Past Payment',
         'Penalty Fee',
       ].map<DropdownMenuItem<String>>((String value) {
@@ -146,24 +183,32 @@ class _PaymentPageState extends State<PaymentPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (totalOwed != null)
+          Text(
+            'Total Owed: MWK ${totalOwed!.toStringAsFixed(2)}',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        SizedBox(height: 8),
+        if (selectedPaymentType == 'Monthly Contribution' && fixedMonthlyAmount != null)
+          Text(
+            'Monthly Contribution: MWK ${fixedMonthlyAmount!.toStringAsFixed(2)}',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        SizedBox(height: 8),
         TextField(
           controller: _amountController,
           decoration: InputDecoration(labelText: 'Enter Amount (MWK)'),
           keyboardType: TextInputType.number,
         ),
+        TextButton(
+          onPressed: () {
+            setState(() {
+              _amountController.text = totalOwed!.toStringAsFixed(2); // Auto-populate the total owed
+            });
+          },
+          child: Text('Auto-Populate Total Owed'),
+        ),
         SizedBox(height: 8),
-        if (fixedMonthlyAmount != null) ...[
-          Text(
-              'Fixed Monthly Contribution: MWK ${fixedMonthlyAmount!.toStringAsFixed(2)}'),
-          TextButton(
-            onPressed: () {
-              setState(() {
-                _amountController.text = fixedMonthlyAmount!.toStringAsFixed(2);
-              });
-            },
-            child: Text('Click to Auto-Populate Amount'),
-          ),
-        ],
       ],
     );
   }
@@ -179,17 +224,17 @@ class _PaymentPageState extends State<PaymentPage> {
     return OutlinedButton.icon(
       onPressed: _pickScreenshot,
       icon: Icon(Icons.image),
-      label: Text(_screenshotFile == null
-          ? 'Upload Proof of Payment Screenshot'
-          : 'Screenshot Selected'),
+      label: Text(_screenshotFile == null ? 'Upload Proof of Payment Screenshot' : 'Screenshot Selected'),
     );
   }
 
   Widget _buildSubmitButton() {
-    return ElevatedButton(
-      onPressed: _submitPayment,
-      child: Text('Submit Payment'),
-    );
+    return _isSubmitting
+        ? Center(child: CircularProgressIndicator())
+        : ElevatedButton(
+            onPressed: _submitPayment,
+            child: Text('Submit Payment'),
+          );
   }
 
   @override

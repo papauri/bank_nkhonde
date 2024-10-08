@@ -22,14 +22,13 @@ class GroupOverviewPage extends StatefulWidget {
 }
 
 class _GroupOverviewPageState extends State<GroupOverviewPage> {
-  double totalFunds = 0.0;
   double totalContributions = 0.0;
   double pendingLoanAmount = 0.0;
   int pendingLoanApplicants = 0;
   double seedMoney = 0.0;
   double interestRate = 0.0;
   double fixedAmount = 0.0;
-  int pendingPaymentsCount = 0; // Track pending payments count
+  int pendingPaymentsCount = 0;
 
   @override
   void initState() {
@@ -81,32 +80,31 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
     }
   }
 
-Future<void> _fetchTotalContributions() async {
-  try {
-    QuerySnapshot paymentsSnapshot = await FirebaseFirestore.instance
-        .collection('groups')
-        .doc(widget.groupId)
-        .collection('payments')
-        .where('status', isEqualTo: 'confirmed') // Fetch only confirmed payments
-        .get();
+  Future<void> _fetchTotalContributions() async {
+    try {
+      QuerySnapshot paymentsSnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .collection('payments')
+          .where('status', isEqualTo: 'confirmed') // Fetch only confirmed payments
+          .where('paymentType', isEqualTo: 'Monthly Contribution')
+          .get();
 
-    double contributionsSum = 0.0;
+      double contributionsSum = 0.0;
 
-    for (var payment in paymentsSnapshot.docs) {
-      contributionsSum += payment['amount']?.toDouble() ?? 0.0; // Sum confirmed payments
+      for (var payment in paymentsSnapshot.docs) {
+        contributionsSum += payment['amount']?.toDouble() ?? 0.0; // Sum confirmed payments
+      }
+
+      setState(() {
+        totalContributions = contributionsSum;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to fetch total contributions.')),
+      );
     }
-
-    setState(() {
-      totalContributions = contributionsSum; // Update totalContributions to reflect only confirmed payments
-      totalFunds = totalContributions; // Adjust totalFunds to reflect confirmed contributions only
-    });
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Failed to fetch total contributions.')),
-    );
   }
-}
-
 
   Future<void> _fetchPendingPayments() async {
     try {
@@ -115,18 +113,13 @@ Future<void> _fetchTotalContributions() async {
           .doc(widget.groupId)
           .collection('payments')
           .where('status', isEqualTo: 'pending') // Fetch pending payments
+          .where('paymentType', isEqualTo: 'Monthly Contribution')
           .get();
 
       int paymentsCount = paymentsSnapshot.docs.length;
-      double totalPendingPayments = 0.0;
-
-      for (var payment in paymentsSnapshot.docs) {
-        totalPendingPayments += payment['amount']?.toDouble() ?? 0.0;
-      }
 
       setState(() {
         pendingPaymentsCount = paymentsCount;
-        totalFunds -= totalPendingPayments; // Adjust total funds to reflect pending payments
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -155,8 +148,10 @@ Future<void> _fetchTotalContributions() async {
           physics: AlwaysScrollableScrollPhysics(),
           child: Column(
             children: [
-              GroupHeader(totalFunds: totalFunds,
-               groupId: widget.groupId,),
+              GroupHeader(
+                totalMonthlyContributions: totalContributions,
+                groupId: widget.groupId,
+              ),
               GroupStatsList(
                 totalContributions: totalContributions,
                 pendingLoanAmount: pendingLoanAmount,
@@ -180,46 +175,37 @@ Future<void> _fetchTotalContributions() async {
     );
   }
 
-// Navigation for the total funds breakdown in _handleStatTap
-void _handleStatTap(String statType) {
-  if (statType == 'contributions') {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ContributionsOverviewPage(groupId: widget.groupId),
-      ),
-    );
-  } else if (statType == 'loans') {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PendingLoansPage(
-          groupId: widget.groupId,
-          groupName: widget.groupName,
+  void _handleStatTap(String statType) {
+    if (statType == 'contributions') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ContributionsOverviewPage(groupId: widget.groupId),
         ),
-      ),
-    );
-  } else if (statType == 'pending_payments') {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PaymentManagementPage(
-          groupId: widget.groupId,
-          groupName: widget.groupName,
+      );
+    } else if (statType == 'loans') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PendingLoansPage(
+            groupId: widget.groupId,
+            groupName: widget.groupName,
+          ),
         ),
-      ),
-    );
-  } else if (statType == 'total_funds') {  // For total funds
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PaymentBreakdownPage(groupId: widget.groupId), // Correct navigation
-      ),
-    );
+      );
+    } else if (statType == 'pending_payments') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PaymentManagementPage(
+            groupId: widget.groupId,
+            groupName: widget.groupName,
+          ),
+        ),
+      );
+    }
   }
-}
 
-  // This method opens the EditGroupParametersDialog
   void _showEditGroupParametersDialog() {
     showDialog(
       context: context,
@@ -241,7 +227,6 @@ void _handleStatTap(String statType) {
     );
   }
 
-  // Navigation functions
   void _viewMembers() {
     Navigator.push(
       context,
