@@ -23,7 +23,7 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Login to Bank Nkhonde'),
+        title: Text('Welcome to Bank Nkhonde', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 1,
@@ -40,24 +40,24 @@ class _LoginPageState extends State<LoginPage> {
 
   Widget _buildLoginForm(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.all(16.0),
+      padding: EdgeInsets.all(24.0),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SizedBox(height: 20),
-            _buildTitle(),
             SizedBox(height: 40),
+            _buildIcon(),
+            SizedBox(height: 60),
             _buildEmailField(),
-            SizedBox(height: 20),
-            _buildPasswordField(),
-            SizedBox(height: 10),
-            _buildForgotPasswordButton(),
             SizedBox(height: 30),
+            _buildPasswordField(),
+            SizedBox(height: 20),
+            _buildForgotPasswordButton(),
+            SizedBox(height: 40),
             _buildLoginButtons(),
-            SizedBox(height: 20),
+            SizedBox(height: 40),
             _buildErrorMessage(),
-            SizedBox(height: 20),
+            SizedBox(height: 40),
             _buildRegistrationButton(context),
           ],
         ),
@@ -65,25 +65,11 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _buildTitle() {
-    return Column(
-      children: [
-        Icon(
-          Icons.account_balance,
-          size: 60,
-          color: Colors.black,
-        ),
-        SizedBox(height: 10),
-        Text(
-          'Welcome to Bank Nkhonde',
-          style: TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
+  Widget _buildIcon() {
+    return Icon(
+      Icons.account_balance,
+      size: 80,
+      color: Colors.black,
     );
   }
 
@@ -92,7 +78,7 @@ class _LoginPageState extends State<LoginPage> {
       controller: _emailController,
       decoration: InputDecoration(
         labelText: 'Email Address',
-        border: OutlineInputBorder(),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
         prefixIcon: Icon(Icons.email, color: Colors.black),
       ),
     );
@@ -103,7 +89,7 @@ class _LoginPageState extends State<LoginPage> {
       controller: _passwordController,
       decoration: InputDecoration(
         labelText: 'Password',
-        border: OutlineInputBorder(),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
         prefixIcon: Icon(Icons.lock, color: Colors.black),
       ),
       obscureText: true,
@@ -117,7 +103,7 @@ class _LoginPageState extends State<LoginPage> {
         onPressed: _resetPassword,
         child: Text(
           'Forgot Password?',
-          style: TextStyle(color: Colors.black),
+          style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.w500),
         ),
       ),
     );
@@ -125,41 +111,60 @@ class _LoginPageState extends State<LoginPage> {
 
   Widget _buildLoginButtons() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _buildLoginButton(
-          label: 'Login as Admin',
-          icon: Icons.admin_panel_settings,
-          isAdminLogin: true,
+        Expanded(
+          child: ElevatedButton(
+            onPressed: () {
+              setState(() {
+                isAdminLogin = true;
+              });
+              _submit();
+            },
+            style: ElevatedButton.styleFrom(
+              padding: EdgeInsets.symmetric(vertical: 18),
+              backgroundColor: Colors.black,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              elevation: 5,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.admin_panel_settings, size: 24, color: Colors.white),
+                SizedBox(width: 10),
+                Text('Login as Admin', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
         ),
-        _buildLoginButton(
-          label: 'Login as User',
-          icon: Icons.person,
-          isAdminLogin: false,
+        SizedBox(width: 20),
+        Expanded(
+          child: ElevatedButton(
+            onPressed: () {
+              setState(() {
+                isAdminLogin = false;
+              });
+              _submit();
+            },
+            style: ElevatedButton.styleFrom(
+              padding: EdgeInsets.symmetric(vertical: 18),
+              backgroundColor: Colors.grey[800],
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              elevation: 5,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.person, size: 24, color: Colors.white),
+                SizedBox(width: 10),
+                Text('Login as User', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
         ),
       ],
-    );
-  }
-
-  Widget _buildLoginButton(
-      {required String label,
-      required IconData icon,
-      required bool isAdminLogin}) {
-    return ElevatedButton.icon(
-      onPressed: () {
-        setState(() {
-          this.isAdminLogin = isAdminLogin;
-        });
-        _submit();
-      },
-      icon: Icon(icon, color: Colors.white),
-      label: Text(label),
-      style: ElevatedButton.styleFrom(
-        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-        backgroundColor: Colors.black, // Background color
-        foregroundColor: Colors.white, // Text color
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
     );
   }
 
@@ -169,7 +174,7 @@ class _LoginPageState extends State<LoginPage> {
         padding: const EdgeInsets.all(8.0),
         child: Text(
           errorMessage,
-          style: TextStyle(color: Colors.red, fontSize: 16),
+          style: TextStyle(color: Colors.red, fontSize: 18, fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
       );
@@ -179,20 +184,32 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _buildRegistrationButton(BuildContext context) {
-    return TextButton(
-      onPressed: () {
-        // Navigate to Admin registration page
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => RegistrationPage(),
+    return Column(
+      children: [
+        Divider(color: Colors.black, thickness: 1.5),
+        SizedBox(height: 10),
+        Text(
+          "Don't have an admin account?",
+          style: TextStyle(fontSize: 18, color: Colors.black, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic),
+          textAlign: TextAlign.center,
+        ),
+        SizedBox(height: 10),
+        TextButton(
+          style: TextButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 15)),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => RegistrationPage(),
+              ),
+            );
+          },
+          child: Text(
+            'Register here',
+            style: TextStyle(color: Colors.black, fontSize: 18, decoration: TextDecoration.underline),
           ),
-        );
-      },
-      child: Text(
-        'Don\'t have an admin account? Register here',
-        style: TextStyle(color: Colors.black),
-      ),
+        ),
+      ],
     );
   }
 
@@ -215,7 +232,7 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-void _submit() async {
+  void _submit() async {
     String email = _emailController.text.trim();
     String password = _passwordController.text.trim();
 
@@ -225,7 +242,6 @@ void _submit() async {
     });
 
     try {
-      // Sign in with Firebase Authentication
       UserCredential userCredential = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
@@ -233,19 +249,16 @@ void _submit() async {
       User? user = userCredential.user;
 
       if (user != null) {
-        // Fetch user document from Firestore
         DocumentSnapshot userDoc =
             await _db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
-          final data = userDoc.data() as Map<String, dynamic>?;
+          final Map<String, dynamic>? data = userDoc.data() as Map<String, dynamic>?;
 
           if (data != null) {
-            String role = data['role'] ?? 'member'; // Fetch the role, default to 'member'
+            String role = data['role'] ?? 'member';
             String groupName = data['groupName'] ?? 'No Group';
 
-            // Navigate based on the role stored in Firestore
             if (isAdminLogin && role == 'admin') {
-              // Admin login logic
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
@@ -257,12 +270,11 @@ void _submit() async {
                 ),
               );
             } else if (!isAdminLogin && role == 'member') {
-              // Member login logic
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
                   builder: (context) => UserDashboard(
-                    isAdmin: false, // Ensure that the user is not an admin
+                    isAdmin: false,
                   ),
                 ),
               );
@@ -288,7 +300,6 @@ void _submit() async {
       });
     }
   }
-
 
   String _getErrorMessage(FirebaseAuthException error) {
     switch (error.code) {
@@ -317,8 +328,7 @@ void _submit() async {
 
   void _clearErrorMessage() {
     setState(() {
-      errorMessage =
-          ''; // Clears error message when user interacts with input fields
+      errorMessage = '';
     });
   }
 

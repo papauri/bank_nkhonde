@@ -12,6 +12,39 @@ class PaymentBreakdownPage extends StatefulWidget {
 }
 
 class _PaymentBreakdownPageState extends State<PaymentBreakdownPage> {
+  String? selectedPayerName;
+  double fixedAmount = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchFixedAmount();
+  }
+
+  Future<void> _fetchFixedAmount() async {
+    try {
+      // Fetch the fixedAmount directly from the group document
+      DocumentSnapshot groupSnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .get();
+
+      if (groupSnapshot.exists) {
+        setState(() {
+          fixedAmount = (groupSnapshot.data() as Map<String, dynamic>)['fixedAmount']?.toDouble() ?? 0.0;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Group document does not exist.')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to fetch fixed amount: $e')),
+      );
+    }
+  }
+
   Future<void> _refreshPayments() async {
     setState(() {}); // Trigger a refresh
   }
@@ -46,9 +79,20 @@ class _PaymentBreakdownPageState extends State<PaymentBreakdownPage> {
               );
             }
 
+            // Extract unique payer names for dropdown
+            final payerNames = payments
+                .map((payment) => payment['payerName'])
+                .toSet()
+                .toList();
+
+            // Filter payments by selected payer, if any
+            final filteredPayments = selectedPayerName == null
+                ? payments
+                : payments.where((payment) => payment['payerName'] == selectedPayerName).toList();
+
             // Group payments by year, then by month
             Map<String, Map<String, List<QueryDocumentSnapshot>>> groupedPayments = {};
-            for (var payment in payments) {
+            for (var payment in filteredPayments) {
               final paymentDate = (payment['paymentDate'] as Timestamp).toDate();
               String year = DateFormat('yyyy').format(paymentDate);
               String month = DateFormat('MMMM').format(paymentDate);
@@ -58,11 +102,42 @@ class _PaymentBreakdownPageState extends State<PaymentBreakdownPage> {
               groupedPayments[year]![month]!.add(payment);
             }
 
-            return ListView(
-              padding: const EdgeInsets.all(16.0),
-              children: groupedPayments.entries.map((yearEntry) {
-                return _buildYearSection(yearEntry.key, yearEntry.value);
-              }).toList(),
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: DropdownButton<String>(
+                    hint: Text('Filter by Member (optional)'),
+                    value: selectedPayerName,
+                    isExpanded: true,
+                    items: [
+                      DropdownMenuItem<String>(
+                        value: null,
+                        child: Text('Show All Members'),
+                      ),
+                      ...payerNames.map((payerName) {
+                        return DropdownMenuItem<String>(
+                          value: payerName,
+                          child: Text(payerName),
+                        );
+                      }).toList(),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        selectedPayerName = value;
+                      });
+                    },
+                  ),
+                ),
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.all(16.0),
+                    children: groupedPayments.entries.map((yearEntry) {
+                      return _buildYearSection(yearEntry.key, yearEntry.value);
+                    }).toList(),
+                  ),
+                ),
+              ],
             );
           },
         ),
@@ -87,26 +162,58 @@ class _PaymentBreakdownPageState extends State<PaymentBreakdownPage> {
   }
 
   Widget _buildMonthSection(String month, List<QueryDocumentSnapshot> payments) {
-    double totalAmount = payments.fold(0.0, (sum, payment) => sum + (payment['amount']?.toDouble() ?? 0.0));
+    // Calculate total confirmed payment for each user
+    Map<String, double> userTotalPayments = {};
+    for (var payment in payments) {
+      String payerName = payment['payerName'] ?? 'Unknown';
+      double amount = payment['amount']?.toDouble() ?? 0.0;
+      userTotalPayments[payerName] = (userTotalPayments[payerName] ?? 0.0) + amount;
+    }
+
     return ExpansionTile(
       title: Text(
-        '$month - Total: MWK ${totalAmount.toStringAsFixed(2)}',
+        '$month',
         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
       ),
-      children: payments.map((payment) {
-        String paymentDateFormatted = DateFormat('dd MMM yyyy').format((payment['paymentDate'] as Timestamp).toDate());
-        return ListTile(
-          leading: Icon(Icons.check_circle, color: Colors.green),
-          title: Text('MWK ${payment['amount']}'),
-          subtitle: Text('Date: $paymentDateFormatted\nReference: ${payment['transactionReference'] ?? 'N/A'}'),
-          trailing: payment['screenshotUrl'] != null
-              ? IconButton(
-                  icon: Icon(Icons.image, color: Colors.blue),
-                  onPressed: () => _showImageDialog(context, payment['screenshotUrl']),
-                )
-              : null,
-        );
-      }).toList(),
+      children: [
+        ...userTotalPayments.entries.map((entry) {
+          String payerName = entry.key;
+          double totalPaid = entry.value;
+          double balance = fixedAmount - totalPaid;
+
+          return Column(
+            children: [
+              ListTile(
+                title: Text(
+                  'Payer: $payerName - Total Paid: MWK ${totalPaid.toStringAsFixed(2)}',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(
+                  'Balance: MWK ${balance.toStringAsFixed(2)}',
+                  style: TextStyle(color: balance > 0 ? Colors.red : Colors.green),
+                ),
+              ),
+              ...payments.where((payment) => payment['payerName'] == payerName).map((payment) {
+                String paymentDateFormatted =
+                    DateFormat('dd MMM yyyy').format((payment['paymentDate'] as Timestamp).toDate());
+                return ListTile(
+                  leading: Icon(Icons.check_circle, color: Colors.green),
+                  title: Text('MWK ${payment['amount']}'),
+                  subtitle: Text(
+                    'Date: $paymentDateFormatted\nReference: ${payment['transactionReference'] ?? 'N/A'}',
+                  ),
+                  trailing: payment['screenshotUrl'] != null
+                      ? IconButton(
+                          icon: Icon(Icons.image, color: Colors.blue),
+                          onPressed: () => _showImageDialog(context, payment['screenshotUrl']),
+                        )
+                      : null,
+                );
+              }).toList(),
+            ],
+          );
+        }).toList(),
+      ],
     );
   }
 
@@ -117,7 +224,17 @@ class _PaymentBreakdownPageState extends State<PaymentBreakdownPage> {
         return Dialog(
           child: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Image.network(imageUrl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Payment Screenshot',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 10),
+                Image.network(imageUrl),
+              ],
+            ),
           ),
         );
       },

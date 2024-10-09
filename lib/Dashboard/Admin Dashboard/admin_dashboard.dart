@@ -4,7 +4,8 @@ import 'package:bank_nkhonde/Login%20Page/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'Group Management/admin_group_list.dart'; // Import the new admin group list file
+import 'Group Management/admin_group_list.dart';
+import 'admin_settings.dart'; // Import the new admin settings file
 
 class AdminDashboard extends StatefulWidget {
   final bool isAdmin;
@@ -53,10 +54,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
-      onWillPop: () async => false, // Disable back button
+      onWillPop: () async => false,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(isAdminView ? 'Admin Dashboard' : 'User Dashboard'),
+          title: Text(isAdminView ? 'Admin Dashboard' : 'User Dashboard',
+              style: TextStyle(fontWeight: FontWeight.bold)),
           centerTitle: true,
           backgroundColor: Colors.white,
           elevation: 1,
@@ -66,11 +68,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
           onRefresh: _refreshGroups,
           child: isAdminView
               ? _buildAdminBody()
-              : UserDashboard(isAdmin: widget.isAdmin), // Pass isAdmin to UserDashboard
+              : UserDashboard(isAdmin: widget.isAdmin),
         ),
         bottomNavigationBar: isAdminView
-            ? _buildBottomNavigationBar() // Only show Admin BottomNavigationBar in admin view
-            : null, // Remove BottomNavigationBar when in user view
+            ? _buildBottomNavigationBar()
+            : null,
       ),
     );
   }
@@ -81,7 +83,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       child: Column(
         children: [
           _buildHeaderSection(),
-          AdminGroupList(), // Use the separated AdminGroupList widget
+          AdminGroupList(),
           SizedBox(height: 20),
         ],
       ),
@@ -95,18 +97,18 @@ class _AdminDashboardState extends State<AdminDashboard> {
         children: [
           Icon(
             Icons.admin_panel_settings,
-            size: 60,
+            size: 80,
             color: Colors.black,
           ),
-          SizedBox(height: 10),
+          SizedBox(height: 20),
           Text(
             'Welcome, $userName',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
           ),
           SizedBox(height: 10),
           Text(
             'Here are your groups:',
-            style: TextStyle(color: Colors.grey[600], fontSize: 16),
+            style: TextStyle(color: Colors.grey[600], fontSize: 18),
           ),
         ],
       ),
@@ -115,6 +117,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _buildBottomNavigationBar() {
     return BottomNavigationBar(
+      type: BottomNavigationBarType.fixed,
       items: [
         BottomNavigationBarItem(
           icon: Icon(Icons.logout),
@@ -124,13 +127,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
           icon: Icon(
             isAdminView ? Icons.person : Icons.admin_panel_settings,
           ),
-          label: isAdminView ? 'User View' : 'Admin View',
+          label: isAdminView ? 'Switch to User View' : 'Switch to Admin View',
         ),
-        if (isAdminView) // Create Group button only appears in admin view
+        if (isAdminView)
           BottomNavigationBarItem(
             icon: Icon(Icons.group_add),
             label: 'Create Group',
           ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.settings),
+          label: 'Settings',
+        ),
       ],
       onTap: (index) {
         switch (index) {
@@ -143,7 +150,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
             break;
           case 1:
             if (isAdminView) {
-              // Switching from Admin to User View
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
@@ -151,7 +157,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ),
               );
             } else {
-              // Switching from User to Admin View
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
@@ -171,6 +176,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 MaterialPageRoute(builder: (context) => GroupCreationPage()),
               );
             }
+            break;
+          case 3:
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => AdminSettingsPage()),
+            );
             break;
         }
       },
