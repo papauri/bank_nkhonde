@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 class SeedMoneySummaryPage extends StatefulWidget {
   final String groupId;
@@ -13,6 +14,7 @@ class SeedMoneySummaryPage extends StatefulWidget {
 class _SeedMoneySummaryPageState extends State<SeedMoneySummaryPage> {
   bool isLoading = true;
   List<Map<String, dynamic>> members = [];
+  int currentYear = DateTime.now().year;
 
   @override
   void initState() {
@@ -99,7 +101,7 @@ class _SeedMoneySummaryPageState extends State<SeedMoneySummaryPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Seed Money Summary'),
+        title: Text('Seed Money Summary for $currentYear'),
       ),
       body: isLoading
           ? Center(child: CircularProgressIndicator())
@@ -164,6 +166,9 @@ class _SeedMoneySummaryPageState extends State<SeedMoneySummaryPage> {
   }
 
   Widget _buildPaymentTile(QueryDocumentSnapshot payment) {
+    DateTime paymentDate = (payment['paymentDate'] as Timestamp).toDate();
+    String formattedDate = DateFormat('dd MMM yyyy, hh:mm a').format(paymentDate);
+
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8.0),
       shape: RoundedRectangleBorder(
@@ -178,7 +183,7 @@ class _SeedMoneySummaryPageState extends State<SeedMoneySummaryPage> {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Date Paid: ${payment['paymentDate'].toDate()}'),
+            Text('Date Paid: $formattedDate'),
             Text('Reference: ${payment['transactionReference']}'),
           ],
         ),
@@ -206,7 +211,17 @@ class _SeedMoneySummaryPageState extends State<SeedMoneySummaryPage> {
         return Dialog(
           child: Container(
             padding: EdgeInsets.all(16),
-            child: Image.network(imageUrl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Payment Screenshot',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 10),
+                Image.network(imageUrl),
+              ],
+            ),
           ),
         );
       },

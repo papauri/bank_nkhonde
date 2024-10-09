@@ -4,6 +4,8 @@ import 'member_list_tile.dart';
 import 'user_payment_page.dart'; // Import the new payment page
 import 'user_payment_details_page.dart'; // Import for navigating to payment details
 import 'seed_money_payment_page.dart'; // Import the Seed Money Payment Page
+import 'apply_for_loan_page.dart'; // Import Apply for Loan Page
+import 'users_loan_details_page.dart'; // Import User's Loan Details Page
 
 class GroupDetailsPage extends StatefulWidget {
   final String groupId;
@@ -24,12 +26,17 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   double seedMoneyPaid = 0.0; // Seed money paid by the user
   List<Map<String, dynamic>> members = [];
   double pendingPayments = 0.0; // Field for pending payments
+  bool hasLoanApplication = false;
+  double loanAmount = 0.0;
+  String loanStatus = '';
+  DateTime? dueDate;
 
   @override
   void initState() {
     super.initState();
     _fetchGroupData();
     _fetchUserFinancialData(); // Fetch user-specific financial data
+    _fetchUserLoanData(); // Fetch user-specific loan data
   }
 
   Future<void> _fetchGroupData() async {
@@ -103,6 +110,30 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     }
   }
 
+  Future<void> _fetchUserLoanData() async {
+    try {
+      // Fetch user loan details
+      QuerySnapshot loanSnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .collection('loans')
+          .where('userId', isEqualTo: widget.userId)
+          .get();
+
+      if (loanSnapshot.docs.isNotEmpty) {
+        var loanData = loanSnapshot.docs.first.data() as Map<String, dynamic>;
+        setState(() {
+          hasLoanApplication = true;
+          loanAmount = (loanData['amount'] ?? 0.0).toDouble();
+          loanStatus = loanData['status'] ?? 'Pending';
+          dueDate = (loanData['dueDate'] as Timestamp).toDate();
+        });
+      }
+    } catch (e) {
+      print('Error fetching user loan data: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final Color primaryColor = Colors.blueGrey[800]!;
@@ -121,6 +152,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
         onRefresh: () async {
           await _fetchGroupData();
           await _fetchUserFinancialData();
+          await _fetchUserLoanData();
         },
         child: ListView(
           padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
@@ -151,6 +183,14 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
             // Payment Button
             _buildPaymentButton(primaryColor), // Payment button added here
 
+            SizedBox(height: 16),
+
+            // User Loan Details Box
+            if (hasLoanApplication) ...[
+              SizedBox(height: 16),
+              _buildUserLoanDetailsTile(),
+            ],
+
             SizedBox(height: 32),
 
             // Members Section
@@ -160,6 +200,71 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
             ),
             SizedBox(height: 16),
             _buildMembersList(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUserLoanDetailsTile() {
+    return GestureDetector(
+      onTap: () {
+        // Navigate to user's loan details page
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => UsersLoanDetailsPage(groupId: widget.groupId, userId: widget.userId),
+          ),
+        );
+      },
+      child: Container(
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.3),
+              spreadRadius: 2,
+              blurRadius: 8,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Loan Amount',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'MWK ${loanAmount.toStringAsFixed(2)}',
+                  style: TextStyle(fontSize: 18, color: Colors.orange),
+                ),
+              ],
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  'Status',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  '$loanStatus',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: loanStatus == 'approved' ? Colors.green : Colors.redAccent,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -236,7 +341,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => SeedMoneyPaymentPage(groupId: widget.groupId),
+            builder: (context            ) => SeedMoneyPaymentPage(groupId: widget.groupId),
           ),
         );
       },
@@ -329,7 +434,17 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   Widget _buildApplyForLoanButton(Color primaryColor) {
     return ElevatedButton(
       onPressed: () {
-        // Navigate to loan application page or show a dialog
+        // Navigate to Apply for Loan Page
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ApplyForLoanPage(
+              groupId: widget.groupId,
+              userId: widget.userId,
+              groupName: widget.groupName,
+            ),
+          ),
+        );
       },
       style: ElevatedButton.styleFrom(
         backgroundColor: primaryColor,
@@ -387,3 +502,4 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     );
   }
 }
+

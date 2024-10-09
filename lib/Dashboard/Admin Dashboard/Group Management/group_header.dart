@@ -33,7 +33,7 @@ class GroupHeader extends StatelessWidget {
                   context,
                   title: '$currentMonth Contributions',
                   subtitle: 'Tap to view - MWK ${currentMonthContributions.toStringAsFixed(2)}',
-                  colors: [Colors.orange, Colors.deepOrange],
+                  colors: [Colors.orangeAccent, Colors.deepOrangeAccent],
                   icon: Icons.monetization_on,
                   onTap: () {
                     Navigator.push(
@@ -52,7 +52,7 @@ class GroupHeader extends StatelessWidget {
                   context,
                   title: 'Yearly Contributions',
                   subtitle: 'Tap to view - MWK ${totalYearlyContributions.toStringAsFixed(2)}',
-                  colors: [Colors.green, Colors.lightGreen],
+                  colors: [Colors.lightGreen, Colors.green],
                   icon: Icons.calendar_today,
                   onTap: () {
                     Navigator.push(
@@ -75,7 +75,7 @@ class GroupHeader extends StatelessWidget {
                   context,
                   title: 'Contributions Summary',
                   subtitle: 'Tap to view - MWK ${totalContributions.toStringAsFixed(2)}',
-                  colors: [Colors.blue, Colors.lightBlue],
+                  colors: [Colors.lightBlue, Colors.blueAccent],
                   icon: Icons.attach_money,
                   onTap: () {
                     Navigator.push(
@@ -94,7 +94,7 @@ class GroupHeader extends StatelessWidget {
                   context,
                   title: 'Seed Money Summary',
                   subtitle: 'Tap to view members\' payments',
-                  colors: [Colors.purple, Colors.purpleAccent],
+                  colors: [Colors.purpleAccent, Colors.deepPurple],
                   icon: Icons.group,
                   onTap: () {
                     Navigator.push(
@@ -124,6 +124,7 @@ class GroupHeader extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        constraints: BoxConstraints(minHeight: 170, maxHeight: 170), // Ensuring consistent height for all tiles
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: colors,
@@ -140,24 +141,28 @@ class GroupHeader extends StatelessWidget {
             ),
           ],
         ),
-        padding: EdgeInsets.symmetric(vertical: 25, horizontal: 20),
+        padding: EdgeInsets.symmetric(vertical: 20, horizontal: 15),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 42, color: Colors.white),
-            SizedBox(height: 15),
+            Icon(icon, size: 40, color: Colors.white),
+            SizedBox(height: 10),
             Text(
               title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
               textAlign: TextAlign.center,
             ),
-            SizedBox(height: 10),
+            SizedBox(height: 8),
             Text(
               subtitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: Colors.white.withOpacity(0.9),
                 fontSize: 14,
