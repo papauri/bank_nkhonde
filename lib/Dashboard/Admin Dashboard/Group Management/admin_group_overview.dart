@@ -29,6 +29,7 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
   double seedMoney = 0.0;
   double interestRate = 0.0;
   double fixedAmount = 0.0;
+  double quarterlyPaymentAmount = 0.0; // Added quarterly payment field
   int pendingPaymentsCount = 0;
 
   @override
@@ -54,6 +55,7 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
           seedMoney = (data['seedMoney']?.toDouble() ?? 0.0);
           interestRate = (data['interestRate']?.toDouble() ?? 0.0);
           fixedAmount = (data['fixedAmount']?.toDouble() ?? 0.0);
+          quarterlyPaymentAmount = (groupSnapshot['quarterlyPaymentAmount'] ?? 0.0).toDouble(); // Added quarterly payment amount
         });
       }
 
@@ -229,10 +231,12 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
           child: Column(
             children: [
               GroupHeader(
-                currentMonthContributions: currentMonthContributions, // Updated parameter name
+                currentMonthContributions: currentMonthContributions,
                 totalYearlyContributions: totalYearlyContributions,
                 totalContributions: totalContributions,
+                quarterlyPaymentAmount: quarterlyPaymentAmount, // Added this line
                 groupId: widget.groupId,
+                groupName: widget.groupName,
               ),
               GroupStatsList(
                 totalContributions: totalContributions,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import 'dart:math';
 import '../Dashboard/Admin Dashboard/admin_dashboard.dart';
 
@@ -21,6 +22,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
   final TextEditingController _seedMoneyController = TextEditingController();
   final TextEditingController _interestRateController = TextEditingController();
   final TextEditingController _monthlyContributionController = TextEditingController();
+  final TextEditingController _quarterlyPaymentController = TextEditingController(); // New field for quarterly payments
+  DateTime? _quarterlyStartDate; // New field for quarterly payment start date
 
   bool isLoading = false;
   String errorMessage = '';
@@ -40,12 +43,23 @@ class _RegistrationPageState extends State<RegistrationPage> {
     _invitationCodeController.text = generatedCode;
 
     try {
-      await _db.collection('invitationCodes').add({
-        'code': generatedCode,
-        'approved': false, // Needs approval by the database admin
-        'used': false,
-        'createdAt': Timestamp.now(),
-      });
+      QuerySnapshot snapshot = await _db.collection('invitationCodes').limit(1).get();
+
+      if (snapshot.docs.isEmpty) {
+        await _db.collection('invitationCodes').add({
+          'code': generatedCode,
+          'approved': false,
+          'used': false,
+          'createdAt': Timestamp.now(),
+        });
+      } else {
+        await _db.collection('invitationCodes').add({
+          'code': generatedCode,
+          'approved': false,
+          'used': false,
+          'createdAt': Timestamp.now(),
+        });
+      }
     } catch (e) {
       setState(() {
         errorMessage = 'Failed to generate invitation code. Please try again later.';
@@ -107,7 +121,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
           SizedBox(height: 20),
           _buildTextField(_passwordController, 'Password', Icons.lock_outline, obscureText: true),
           SizedBox(height: 40),
-          
+
           // Invitation Code field (read-only)
           _buildTextField(_invitationCodeController, 'Invitation Code', Icons.vpn_key, readOnly: true),
 
@@ -129,6 +143,10 @@ class _RegistrationPageState extends State<RegistrationPage> {
             _buildTextField(_interestRateController, 'Interest Rate (%)', Icons.percent),
             SizedBox(height: 20),
             _buildTextField(_monthlyContributionController, 'Monthly Contribution (MWK)', Icons.attach_money),
+            SizedBox(height: 20),
+            _buildTextField(_quarterlyPaymentController, 'Quarterly Payment (MWK) - Optional', Icons.attach_money),
+            SizedBox(height: 20),
+            _buildDatePickerField('Quarterly Payment Start Date - Optional'),
             SizedBox(height: 40),
           ],
 
@@ -163,7 +181,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {bool obscureText = false, bool readOnly = false}) {
+  Widget _buildTextField(TextEditingController controller, String label, IconData icon,
+      {bool obscureText = false, bool readOnly = false}) {
     return TextField(
       controller: controller,
       obscureText: obscureText,
@@ -179,12 +198,50 @@ class _RegistrationPageState extends State<RegistrationPage> {
     );
   }
 
+  Widget _buildDatePickerField(String label) {
+    return GestureDetector(
+      onTap: () async {
+        DateTime? pickedDate = await showDatePicker(
+          context: context,
+          initialDate: DateTime.now(),
+          firstDate: DateTime(2000),
+          lastDate: DateTime(2100),
+        );
+        if (pickedDate != null) {
+          setState(() {
+            _quarterlyStartDate = pickedDate;
+          });
+        }
+      },
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey),
+          color: Colors.white,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              _quarterlyStartDate != null
+                  ? 'Quarterly Start Date: ${DateFormat.yMMMd().format(_quarterlyStartDate!)}'
+                  : label,
+              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+            ),
+            Icon(Icons.calendar_today, color: Colors.grey[600]),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _registerAdmin() async {
     String email = _emailController.text.trim();
     String password = _passwordController.text.trim();
     String name = _nameController.text.trim();
     String phone = _phoneController.text.trim();
-    String invitationCode = _invitationCodeController.text.trim(); // Get the invitation code
+    String invitationCode = _invitationCodeController.text.trim();
 
     if (email.isEmpty || password.isEmpty || name.isEmpty || phone.isEmpty || invitationCode.isEmpty) {
       setState(() {
@@ -199,11 +256,10 @@ class _RegistrationPageState extends State<RegistrationPage> {
     });
 
     try {
-      // Validate invitation code (it must be approved by admin)
       QuerySnapshot snapshot = await _db
           .collection('invitationCodes')
           .where('code', isEqualTo: invitationCode)
-          .where('approved', isEqualTo: true) // Only approved codes are allowed
+          .where('approved', isEqualTo: true)
           .where('used', isEqualTo: false)
           .get();
 
@@ -215,7 +271,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
         return;
       }
 
-      // Proceed with registration
       UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
@@ -223,29 +278,24 @@ class _RegistrationPageState extends State<RegistrationPage> {
       User? user = userCredential.user;
 
       if (user != null) {
-        // Default Material Icon DP (Flutter Icons)
-        String defaultIcon = 'account_circle'; // Store the material icon as a string
+        String defaultIcon = 'account_circle';
 
-        // Save admin details in Firestore (in 'users' collection)
         await _db.collection('users').doc(user.uid).set({
-          'userId': user.uid, // Ensure the user ID is stored
+          'userId': user.uid,
           'name': name,
           'email': email,
           'phone': phone,
-          'role': 'admin', // Ensure the role is admin
-          'profilePicture': defaultIcon, // Store the icon name as the profile picture
+          'role': 'admin',
+          'profilePicture': defaultIcon,
           'createdAt': Timestamp.now(),
         });
 
-        // Mark invitation code as used
         await _db.collection('invitationCodes').doc(snapshot.docs[0].id).update({'used': true});
 
-        // If "Create Group" option is selected
         if (createGroup) {
           await _createGroup(user.uid, name, phone, email);
         }
 
-        // Navigate to Admin Dashboard after successful registration
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -270,19 +320,26 @@ class _RegistrationPageState extends State<RegistrationPage> {
     double seedMoney = double.tryParse(_seedMoneyController.text.trim()) ?? 0.0;
     double interestRate = double.tryParse(_interestRateController.text.trim()) ?? 0.0;
     double monthlyContribution = double.tryParse(_monthlyContributionController.text.trim()) ?? 0.0;
+    double? quarterlyPayment = double.tryParse(_quarterlyPaymentController.text.trim());
 
-    // Create the group and get the group ID
+    // Calculate the next due date based on the quarterly start date
+    DateTime? nextDueDate;
+    if (_quarterlyStartDate != null) {
+      nextDueDate = _quarterlyStartDate!.add(Duration(days: 90));
+    }
+
     DocumentReference groupRef = await _db.collection('groups').add({
       'groupName': groupName,
       'admin': adminId,
       'seedMoney': seedMoney,
       'interestRate': interestRate,
       'fixedAmount': monthlyContribution,
+      'quarterlyPaymentAmount': quarterlyPayment,
+      'nextDueDate': nextDueDate != null ? Timestamp.fromDate(nextDueDate) : null,
       'createdAt': Timestamp.now(),
-      'totalContributions': 0.0, // Initialize total contributions
+      'totalContributions': 0.0,
     });
 
-    // Add the admin as a member of the group using the 'members' array in the same document
     await groupRef.update({
       'members': FieldValue.arrayUnion([
         {
@@ -290,8 +347,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
           'name': name,
           'contact': phone,
           'email': email,
-          'role': 'admin', // Mark the role as 'admin'
-          'profilePicture': 'account_circle', // Use Material icon for the profile picture
+          'role': 'admin',
+          'profilePicture': 'account_circle',
         }
       ]),
     });

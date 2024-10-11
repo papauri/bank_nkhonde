@@ -1,23 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class ApplyForLoanPage extends StatelessWidget {
+class ApplyForLoanPage extends StatefulWidget {
   final String groupId;
-  final String groupName;
   final String userId;
+  final double loanAmount;  // Confirmed loan amount
+  final double interestRate; // Interest rate of the loan
+  final int repaymentPeriod; // Loan repayment period in months
+  final double outstandingBalance; // Outstanding loan balance to be updated
 
-  ApplyForLoanPage({required this.groupId, required this.groupName, required this.userId});
+  ApplyForLoanPage({
+    required this.groupId,
+    required this.userId,
+    required this.loanAmount,
+    required this.interestRate,
+    required this.repaymentPeriod,
+    required this.outstandingBalance,
+  });
 
+  @override
+  _ApplyForLoanPageState createState() => _ApplyForLoanPageState();
+}
+
+class _ApplyForLoanPageState extends State<ApplyForLoanPage> {
   final TextEditingController _amountController = TextEditingController();
 
   Future<Map<String, dynamic>> _fetchGroupData() async {
     try {
-      DocumentSnapshot groupSnapshot = await FirebaseFirestore.instance.collection('groups').doc(groupId).get();
+      DocumentSnapshot groupSnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .get();
       double interestRate = (groupSnapshot['interestRate'] ?? 0.0).toDouble() / 100;
 
       QuerySnapshot confirmedPayments = await FirebaseFirestore.instance
           .collection('groups')
-          .doc(groupId)
+          .doc(widget.groupId)
           .collection('payments')
           .where('status', isEqualTo: 'confirmed')
           .get();
@@ -41,6 +59,79 @@ class ApplyForLoanPage extends StatelessWidget {
         'availableBalance': 0.0,
         'interestRate': 0.0,
       };
+    }
+  }
+
+  Future<void> _applyForLoan(BuildContext context) async {
+    final String loanAmountStr = _amountController.text.trim();
+    double parsedAmount = double.tryParse(loanAmountStr) ?? 0.0;
+
+    if (loanAmountStr.isEmpty || parsedAmount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please enter a valid loan amount greater than zero')),
+      );
+      return;
+    }
+
+    try {
+      Map<String, dynamic> groupData = await _fetchGroupData();
+      double availableBalance = groupData['availableBalance'];
+      double interestRate = groupData['interestRate'];
+
+      if (parsedAmount > availableBalance) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Loan amount cannot exceed the available group balance of MWK $availableBalance')),
+        );
+        return;
+      }
+
+      double totalWithInterest = parsedAmount * (1 + interestRate);
+      double monthlyRepayment = totalWithInterest / 3;  // Example: repay over 3 months
+      DateTime now = DateTime.now();
+      DateTime dueDate = DateTime(now.year, now.month + 3, 0);  // 3 months from now
+
+      var loanQuerySnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .collection('loans')
+          .where('userId', isEqualTo: widget.userId)
+          .get();
+
+      if (loanQuerySnapshot.docs.isEmpty) {
+        var loanDocument = FirebaseFirestore.instance
+            .collection('groups')
+            .doc(widget.groupId)
+            .collection('loans')
+            .doc();
+
+        await loanDocument.set({
+          'userId': widget.userId,
+          'amount': parsedAmount,
+          'interestRate': interestRate * 100,
+          'totalWithInterest': totalWithInterest,
+          'monthlyRepayment': monthlyRepayment,
+          'status': 'pending',
+          'appliedAt': Timestamp.now(),
+          'dueDate': Timestamp.fromDate(dueDate),
+          'repaymentPeriod': widget.repaymentPeriod,
+          'outstandingBalance': totalWithInterest,
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Loan application submitted successfully!')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('You already have an active loan application.')),
+        );
+      }
+
+      Navigator.pop(context);
+    } catch (e) {
+      print('Error applying for loan: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to apply for loan. Please try again.')),
+      );
     }
   }
 
@@ -84,7 +175,7 @@ class ApplyForLoanPage extends StatelessWidget {
                       ),
                       SizedBox(height: 10),
                       Text(
-                        'The loan repayment will be divided equally for the next 3 to 4 months with the interest rate included.',
+                        'The loan repayment will be divided equally for the next 3 months with the interest rate included.',
                         style: TextStyle(fontSize: 14, color: Colors.black54),
                       ),
                     ],
@@ -123,61 +214,5 @@ class ApplyForLoanPage extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  void _applyForLoan(BuildContext context) async {
-    final String loanAmount = _amountController.text.trim();
-
-    if (loanAmount.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please enter a loan amount')),
-      );
-      return;
-    }
-
-    double parsedAmount = double.tryParse(loanAmount) ?? 0.0;
-    if (parsedAmount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please enter a valid loan amount greater than zero')),
-      );
-      return;
-    }
-
-    try {
-      Map<String, dynamic> groupData = await _fetchGroupData();
-      double availableBalance = groupData['availableBalance'];
-
-      if (parsedAmount > availableBalance) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Loan amount cannot exceed the available group balance of MWK $availableBalance')),
-        );
-        return;
-      }
-
-      double interestRate = groupData['interestRate'];
-      double totalWithInterest = parsedAmount * (1 + interestRate);
-      double monthlyRepayment = totalWithInterest / 3;
-
-      await FirebaseFirestore.instance.collection('groups').doc(groupId).collection('loans').add({
-        'userId': userId,
-        'amount': parsedAmount,
-        'status': 'pending',
-        'appliedAt': Timestamp.now(),
-        'groupName': groupName,
-        'interestRate': interestRate * 100,
-        'totalWithInterest': totalWithInterest,
-        'monthlyRepayment': monthlyRepayment,
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Loan application submitted!')),
-      );
-
-      Navigator.pop(context);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to apply for loan. Please try again.')),
-      );
-    }
   }
 }

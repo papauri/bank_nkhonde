@@ -46,26 +46,50 @@ class _PaymentManagementPageState extends State<PaymentManagementPage> {
             }
 
             // Group payments by status, month, and user
-            Map<String, Map<String, Map<String, List<QueryDocumentSnapshot>>>> groupedPayments = {};
+            Map<String, Map<String, Map<String, List<QueryDocumentSnapshot>>>>
+                groupedPayments = {};
 
             for (var payment in payments) {
-              final paymentDate = (payment['paymentDate'] as Timestamp).toDate();
+              final paymentDate =
+                  (payment['paymentDate'] as Timestamp).toDate();
               String monthYear = DateFormat('MMMM yyyy').format(paymentDate);
               String status = payment['status'];
-              String payerName = payment['payerName'];
+
+              // Check if 'payerName' exists, and provide a fallback if it's null
+              Map<String, dynamic>? paymentData = payment.data()
+                  as Map<String, dynamic>?; // Cast and check if null
+
+              String payerName =
+                  (paymentData != null && paymentData.containsKey('payerName'))
+                      ? paymentData['payerName'] as String
+                      : 'Unknown Payer'; // Fallback if 'payerName' is missing
 
               groupedPayments[status] = groupedPayments[status] ?? {};
-              groupedPayments[status]![monthYear] = groupedPayments[status]![monthYear] ?? {};
-              groupedPayments[status]![monthYear]![payerName] = groupedPayments[status]![monthYear]![payerName] ?? [];
+              groupedPayments[status]![monthYear] =
+                  groupedPayments[status]![monthYear] ?? {};
+              groupedPayments[status]![monthYear]![payerName] =
+                  groupedPayments[status]![monthYear]![payerName] ?? [];
               groupedPayments[status]![monthYear]![payerName]!.add(payment);
             }
 
             return ListView(
               padding: const EdgeInsets.all(16.0),
               children: [
-                _buildPaymentSection('Pending Payments', groupedPayments['pending'], Icons.pending_actions, Colors.orange),
-                _buildPaymentSection('Confirmed Payments', groupedPayments['confirmed'], Icons.check_circle, Colors.green),
-                _buildPaymentSection('Rejected Payments', groupedPayments['rejected'], Icons.cancel, Colors.redAccent),
+                _buildPaymentSection(
+                    'Pending Payments',
+                    groupedPayments['pending'],
+                    Icons.pending_actions,
+                    Colors.orange),
+                _buildPaymentSection(
+                    'Confirmed Payments',
+                    groupedPayments['confirmed'],
+                    Icons.check_circle,
+                    Colors.green),
+                _buildPaymentSection(
+                    'Rejected Payments',
+                    groupedPayments['rejected'],
+                    Icons.cancel,
+                    Colors.redAccent),
               ],
             );
           },
@@ -74,7 +98,11 @@ class _PaymentManagementPageState extends State<PaymentManagementPage> {
     );
   }
 
-  Widget _buildPaymentSection(String title, Map<String, Map<String, List<QueryDocumentSnapshot>>>? paymentsByMonth, IconData icon, Color statusColor) {
+  Widget _buildPaymentSection(
+      String title,
+      Map<String, Map<String, List<QueryDocumentSnapshot>>>? paymentsByMonth,
+      IconData icon,
+      Color statusColor) {
     if (paymentsByMonth == null || paymentsByMonth.isEmpty) {
       return Container(); // Hide if empty
     }
@@ -89,11 +117,13 @@ class _PaymentManagementPageState extends State<PaymentManagementPage> {
         leading: Icon(icon, color: statusColor, size: 30),
         title: Text(
           title,
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: statusColor),
+          style: TextStyle(
+              fontSize: 18, fontWeight: FontWeight.bold, color: statusColor),
         ),
         children: paymentsByMonth.entries.map((monthEntry) {
           String monthYear = monthEntry.key;
-          Map<String, List<QueryDocumentSnapshot>> paymentsByUser = monthEntry.value;
+          Map<String, List<QueryDocumentSnapshot>> paymentsByUser =
+              monthEntry.value;
 
           return _buildMonthSection(monthYear, paymentsByUser);
         }).toList(),
@@ -101,133 +131,144 @@ class _PaymentManagementPageState extends State<PaymentManagementPage> {
     );
   }
 
-Widget _buildMonthSection(String monthYear, Map<String, List<QueryDocumentSnapshot>> paymentsByUser) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Container(
-        padding: const EdgeInsets.all(8),
-        color: Colors.teal[50],
-        child: Text(
-          monthYear,
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
-        ),
-      ),
-      ...paymentsByUser.entries.map((userEntry) {
-        String payerName = userEntry.key;
-        List<QueryDocumentSnapshot> userPayments = userEntry.value;
-
-        return ExpansionTile(
-          leading: CircleAvatar(
-            backgroundColor: Colors.teal[100],
-            child: Icon(Icons.person, color: Colors.teal[800]),
-          ),
-          title: Text(
-            payerName,
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-          ),
-          initiallyExpanded: _expandedTileIndex == userPayments.hashCode,
-          onExpansionChanged: (expanded) {
-            setState(() {
-              _expandedTileIndex = expanded ? userPayments.hashCode : null;
-            });
-          },
-          children: userPayments.map((payment) {
-            return ListTile(
-              leading: Icon(
-                payment['status'] == 'confirmed' ? Icons.check_circle : Icons.pending,
-                color: payment['status'] == 'confirmed' ? Colors.green : Colors.orange,
-              ),
-              title: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('MWK ${payment['amount']}'),
-                  if (payment['transactionReference'] != null)
-                    Text('Reference: ${payment['transactionReference']}'),
-                ],
-              ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Payment Date: ${_formatDate(payment['paymentDate'])}',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  if (payment['screenshotUrl'] != null)
-                    GestureDetector(
-                      onTap: () {
-                        _showImageDialog(context, payment['screenshotUrl']);
-                      },
-                      child: Text(
-                        'View Screenshot',
-                        style: TextStyle(color: Colors.blue),
-                      ),
-                    ),
-                ],
-              ),
-              trailing: _buildPaymentActions(payment),
-            );
-          }).toList(),
-        );
-      }).toList(),
-    ],
-  );
-}
-
-Widget _buildPaymentActions(QueryDocumentSnapshot payment) {
-  if (payment['status'] == 'pending') {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+  Widget _buildMonthSection(String monthYear,
+      Map<String, List<QueryDocumentSnapshot>> paymentsByUser) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        IconButton(
-          icon: Icon(Icons.check, color: Colors.green),
-          onPressed: () {
-            _confirmPayment(payment.id, payment['amount'], payment['payerName']);
-          },
-          tooltip: 'Confirm Payment',
+        Container(
+          padding: const EdgeInsets.all(8),
+          color: Colors.teal[50],
+          child: Text(
+            monthYear,
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87),
+          ),
         ),
-        IconButton(
-          icon: Icon(Icons.cancel, color: Colors.red),
-          onPressed: () {
-            _rejectPaymentDialog(payment.id);
-          },
-          tooltip: 'Reject Payment',
-        ),
+        ...paymentsByUser.entries.map((userEntry) {
+          String payerName = userEntry.key;
+          List<QueryDocumentSnapshot> userPayments = userEntry.value;
+
+          return ExpansionTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.teal[100],
+              child: Icon(Icons.person, color: Colors.teal[800]),
+            ),
+            title: Text(
+              payerName,
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            ),
+            initiallyExpanded: _expandedTileIndex == userPayments.hashCode,
+            onExpansionChanged: (expanded) {
+              setState(() {
+                _expandedTileIndex = expanded ? userPayments.hashCode : null;
+              });
+            },
+            children: userPayments.map((payment) {
+              return ListTile(
+                leading: Icon(
+                  payment['status'] == 'confirmed'
+                      ? Icons.check_circle
+                      : Icons.pending,
+                  color: payment['status'] == 'confirmed'
+                      ? Colors.green
+                      : Colors.orange,
+                ),
+                title: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('MWK ${payment['amount']}'),
+                    if (payment['transactionReference'] != null)
+                      Text('Reference: ${payment['transactionReference']}'),
+                  ],
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Payment Date: ${_formatDate(payment['paymentDate'])}',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    if (payment['screenshotUrl'] != null)
+                      GestureDetector(
+                        onTap: () {
+                          _showImageDialog(context, payment['screenshotUrl']);
+                        },
+                        child: Text(
+                          'View Screenshot',
+                          style: TextStyle(color: Colors.blue),
+                        ),
+                      ),
+                  ],
+                ),
+                trailing: _buildPaymentActions(payment),
+              );
+            }).toList(),
+          );
+        }).toList(),
       ],
     );
-  } else {
-    return Text(
-      payment['status'] == 'confirmed' ? 'Confirmed' : 'Rejected',
-      style: TextStyle(color: payment['status'] == 'confirmed' ? Colors.green : Colors.redAccent),
+  }
+
+  Widget _buildPaymentActions(QueryDocumentSnapshot payment) {
+    if (payment['status'] == 'pending') {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: Icon(Icons.check, color: Colors.green),
+            onPressed: () {
+              _confirmPayment(
+                  payment.id, payment['amount'], payment['payerName']);
+            },
+            tooltip: 'Confirm Payment',
+          ),
+          IconButton(
+            icon: Icon(Icons.cancel, color: Colors.red),
+            onPressed: () {
+              _rejectPaymentDialog(payment.id);
+            },
+            tooltip: 'Reject Payment',
+          ),
+        ],
+      );
+    } else {
+      return Text(
+        payment['status'] == 'confirmed' ? 'Confirmed' : 'Rejected',
+        style: TextStyle(
+            color: payment['status'] == 'confirmed'
+                ? Colors.green
+                : Colors.redAccent),
+      );
+    }
+  }
+
+  void _showImageDialog(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          child: Container(
+            padding: EdgeInsets.all(16),
+            child: Image.network(imageUrl),
+          ),
+        );
+      },
     );
   }
-}
-
-void _showImageDialog(BuildContext context, String imageUrl) {
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return Dialog(
-        child: Container(
-          padding: EdgeInsets.all(16),
-          child: Image.network(imageUrl),
-        ),
-      );
-    },
-  );
-}
-
 
   String _formatDate(Timestamp timestamp) {
     DateTime date = timestamp.toDate();
     return DateFormat('EEEE, MMM d, yyyy').format(date);
   }
 
-  void _confirmPayment(String paymentId, double amount, String payerName) async {
+  void _confirmPayment(
+      String paymentId, double amount, String payerName) async {
     try {
-      DocumentReference groupDoc = FirebaseFirestore.instance
-          .collection('groups')
-          .doc(widget.groupId);
+      DocumentReference groupDoc =
+          FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
 
       await FirebaseFirestore.instance
           .collection('groups')
@@ -242,7 +283,8 @@ void _showImageDialog(BuildContext context, String imageUrl) {
         DocumentSnapshot groupSnapshot = await transaction.get(groupDoc);
 
         if (groupSnapshot.exists) {
-          double currentTotalContributions = groupSnapshot['totalContributions']?.toDouble() ?? 0.0;
+          double currentTotalContributions =
+              groupSnapshot['totalContributions']?.toDouble() ?? 0.0;
 
           double updatedTotalContributions = currentTotalContributions + amount;
 
@@ -293,37 +335,37 @@ void _showImageDialog(BuildContext context, String imageUrl) {
   }
 
   void _rejectPaymentDialog(String paymentId) {
-  final TextEditingController _reasonController = TextEditingController();
+    final TextEditingController _reasonController = TextEditingController();
 
-  showDialog(
-    context: context,
-    builder: (context) {
-      return AlertDialog(
-        title: Text('Reject Payment'),
-        content: TextField(
-          controller: _reasonController,
-          decoration: InputDecoration(
-            labelText: 'Reason for rejection',
-            hintText: 'Enter the reason for rejecting this payment',
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Reject Payment'),
+          content: TextField(
+            controller: _reasonController,
+            decoration: InputDecoration(
+              labelText: 'Reason for rejection',
+              hintText: 'Enter the reason for rejecting this payment',
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
-            },
-            child: Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              _rejectPayment(paymentId, _reasonController.text.trim());
-              Navigator.pop(context); // Close dialog after rejection
-            },
-            child: Text('Reject Payment'),
-          ),
-        ],
-      );
-    },
-  );
-}
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // Close dialog
+              },
+              child: Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                _rejectPayment(paymentId, _reasonController.text.trim());
+                Navigator.pop(context); // Close dialog after rejection
+              },
+              child: Text('Reject Payment'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
