@@ -15,6 +15,18 @@ class AdminGroupList extends StatelessWidget {
     );
   }
 
+  Future<int> _fetchPendingLoans(String groupId) async {
+    // Fetch pending loans data from Firestore
+    final loansSnapshot = await FirebaseFirestore.instance
+        .collection('groups')
+        .doc(groupId)
+        .collection('loans')
+        .where('status', isEqualTo: 'pending')
+        .get();
+
+    return loansSnapshot.docs.length; // Return count of pending loans
+  }
+
   Future<double> _fetchPendingPayments(String groupId) async {
     // Fetch pending payments data from Firestore
     final paymentsSnapshot = await FirebaseFirestore.instance
@@ -68,87 +80,126 @@ class AdminGroupList extends StatelessWidget {
             final createdDate = (group['createdAt'] as Timestamp).toDate();
             final members = group['members'] as List<dynamic>;
 
-            return FutureBuilder<double>(
-              future: _fetchPendingPayments(groupId),
-              builder: (context, pendingSnapshot) {
-                if (!pendingSnapshot.hasData) {
-                  return Card(
-                    margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    elevation: 3,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    child: ListTile(
-                      contentPadding: EdgeInsets.all(16),
-                      title: Text('Loading payments...'),
-                    ),
-                  );
-                }
-
-                final pendingPayments = pendingSnapshot.data!;
-                final bool hasPending = pendingPayments > 0;
-
-                return Card(
-                  margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  elevation: 3,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  child: ListTile(
-                    contentPadding: EdgeInsets.all(16),
-                    leading: CircleAvatar(
-                      backgroundColor: hasPending ? Colors.redAccent : Colors.green,
-                      child: Icon(
-                        hasPending ? Icons.warning_amber_rounded : Icons.group,
-                        color: Colors.white,
-                      ),
-                    ),
-                    title: Text(
-                      groupName,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Icon(Icons.people_outline, size: 18, color: Colors.grey),
-                            SizedBox(width: 5),
-                            Text('${members.length} members', style: TextStyle(color: Colors.grey[700])),
-                          ],
+            return FutureBuilder<int>(
+              future: _fetchPendingLoans(groupId), // Fetch pending loans
+              builder: (context, loanSnapshot) {
+                return FutureBuilder<double>(
+                  future: _fetchPendingPayments(groupId), // Fetch pending payments
+                  builder: (context, pendingSnapshot) {
+                    if (!pendingSnapshot.hasData || !loanSnapshot.hasData) {
+                      return Card(
+                        margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        elevation: 3,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        child: ListTile(
+                          contentPadding: EdgeInsets.all(16),
+                          title: Text('Loading payments...'),
                         ),
-                        SizedBox(height: 4),
-                        Row(
+                      );
+                    }
+
+                    final pendingPayments = pendingSnapshot.data!;
+                    final pendingLoans = loanSnapshot.data!;
+                    final bool hasPendingLoans = pendingLoans > 0;
+                    final bool hasPendingPayments = pendingPayments > 0;
+
+                    return Card(
+                      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      elevation: 3,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: ListTile(
+                        contentPadding: EdgeInsets.all(16),
+                        leading: Stack(
                           children: [
-                            Icon(Icons.calendar_today, size: 18, color: Colors.grey),
-                            SizedBox(width: 5),
-                            Text(
-                              'Created on: ${createdDate.day}/${createdDate.month}/${createdDate.year}',
-                              style: TextStyle(color: Colors.grey[700]),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 8),
-                        if (pendingPayments > 0) ...[
-                          Row(
-                            children: [
-                              Icon(Icons.payment, size: 18, color: Colors.redAccent),
-                              SizedBox(width: 5),
-                              Text(
-                                'Pending Payments: MWK $pendingPayments',
-                                style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+                            CircleAvatar(
+                              backgroundColor: (hasPendingLoans || hasPendingPayments)
+                                  ? Colors.redAccent
+                                  : Colors.green,
+                              child: Icon(
+                                Icons.group,
+                                color: Colors.white,
                               ),
-                            ],
+                            ),
+                            if (hasPendingLoans || hasPendingPayments) // Show notification badge
+                              Positioned(
+                                right: 0,
+                                child: Container(
+                                  padding: EdgeInsets.all(2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  constraints: BoxConstraints(
+                                    minWidth: 20,
+                                    minHeight: 20,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      '${pendingLoans + (hasPendingPayments ? 1 : 0)}', // Combined count of loans and payments
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        title: Text(
+                          groupName,
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
                           ),
-                        ],
-                      ],
-                    ),
-                    trailing: Icon(Icons.arrow_forward_ios, color: Colors.black54),
-                    onTap: () {
-                      _showGroupOverview(context, groupId, groupName);
-                    },
-                  ),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Icon(Icons.people_outline, size: 18, color: Colors.grey),
+                                SizedBox(width: 5),
+                                Text('${members.length} members', style: TextStyle(color: Colors.grey[700])),
+                              ],
+                            ),
+                            SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(Icons.calendar_today, size: 18, color: Colors.grey),
+                                SizedBox(width: 5),
+                                Text(
+                                  'Created on: ${createdDate.day}/${createdDate.month}/${createdDate.year}',
+                                  style: TextStyle(color: Colors.grey[700]),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 8),
+                            // Simple note indicating what's pending
+                            if (hasPendingLoans || hasPendingPayments)
+                              Text(
+                                hasPendingLoans && hasPendingPayments
+                                    ? 'Pending loans and payments'
+                                    : hasPendingLoans
+                                        ? 'Pending loans'
+                                        : 'Pending payments',
+                                style: TextStyle(
+                                  color: Colors.redAccent,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                          ],
+                        ),
+                        trailing: Icon(Icons.arrow_forward_ios, color: Colors.black54),
+                        onTap: () {
+                          _showGroupOverview(context, groupId, groupName);
+                        },
+                      ),
+                    );
+                  },
                 );
               },
             );

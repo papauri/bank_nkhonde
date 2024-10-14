@@ -12,6 +12,8 @@ class _GroupCreationPageState extends State<GroupCreationPage> {
   final TextEditingController _seedMoneyController = TextEditingController();
   final TextEditingController _interestRateController = TextEditingController();
   final TextEditingController _fixedAmountController = TextEditingController();
+  final TextEditingController _loanPenaltyController = TextEditingController();  // Loan penalty field
+  final TextEditingController _monthlyPenaltyController = TextEditingController();  // Monthly contribution penalty field
   String errorMessage = '';
 
   void _createGroup() async {
@@ -19,6 +21,8 @@ class _GroupCreationPageState extends State<GroupCreationPage> {
     String seedMoney = _seedMoneyController.text.trim();
     String interestRate = _interestRateController.text.trim();
     String fixedAmount = _fixedAmountController.text.trim();
+    String loanPenalty = _loanPenaltyController.text.trim();  // Get loan penalty
+    String monthlyPenalty = _monthlyPenaltyController.text.trim();  // Get monthly penalty
 
     if (groupName.isEmpty || seedMoney.isEmpty || interestRate.isEmpty || fixedAmount.isEmpty) {
       setState(() {
@@ -36,6 +40,9 @@ class _GroupCreationPageState extends State<GroupCreationPage> {
         'admin': FirebaseAuth.instance.currentUser!.uid,
         'members': [], // Group starts with no members
         'totalContributions': 0.0, // Initialize total contributions
+        'loanPenalty': loanPenalty.isNotEmpty ? double.parse(loanPenalty) : 0.0, // Apply loan penalty if filled
+        'monthlyPenalty': monthlyPenalty.isNotEmpty ? double.parse(monthlyPenalty) : 0.0, // Apply monthly penalty if filled
+        'createdAt': Timestamp.now(), // Add creation timestamp
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -80,6 +87,16 @@ class _GroupCreationPageState extends State<GroupCreationPage> {
               TextField(
                 controller: _fixedAmountController,
                 decoration: InputDecoration(labelText: 'Fixed Monthly Contribution (MWK)'),
+                keyboardType: TextInputType.number,
+              ),
+              TextField(
+                controller: _loanPenaltyController,
+                decoration: InputDecoration(labelText: 'Loan Late Payment Penalty (%)'),
+                keyboardType: TextInputType.number,
+              ),
+              TextField(
+                controller: _monthlyPenaltyController,
+                decoration: InputDecoration(labelText: 'Monthly Contribution Late Penalty (%)'),
                 keyboardType: TextInputType.number,
               ),
               SizedBox(height: 20),

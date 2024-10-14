@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class ApplyForLoanPage extends StatefulWidget {
   final String groupId;
   final String userId;
-  final double loanAmount;  // Confirmed loan amount
+  final double loanAmount; // Confirmed loan amount
   final double interestRate; // Interest rate of the loan
   final int repaymentPeriod; // Loan repayment period in months
   final double outstandingBalance; // Outstanding loan balance to be updated
@@ -24,6 +24,60 @@ class ApplyForLoanPage extends StatefulWidget {
 
 class _ApplyForLoanPageState extends State<ApplyForLoanPage> {
   final TextEditingController _amountController = TextEditingController();
+  String? borrowerName;
+  double? loanPenalty; // Fetch the loanPenalty percentage
+  DateTime? repaymentDueDate;
+  String? transactionReference;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchBorrowerNameAndLoanPenalty();
+    _generateTransactionReference();
+  }
+
+  Future<void> _fetchBorrowerNameAndLoanPenalty() async {
+    try {
+      // Fetch borrower's name
+      DocumentSnapshot userSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.userId)
+          .get();
+
+      // Fetch group data for the loan penalty
+      DocumentSnapshot groupSnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .get();
+
+      setState(() {
+        borrowerName = userSnapshot['name'] ?? 'Borrower';
+
+        // Cast groupSnapshot data to a Map<String, dynamic> to use containsKey
+        final groupData = groupSnapshot.data() as Map<String, dynamic>?;
+
+        // Fetch loanPenalty from the group document
+        loanPenalty = (groupData != null && groupData.containsKey('loanPenalty'))
+            ? (groupData['loanPenalty'] ?? 0.0).toDouble()
+            : 0.0; // Default to 0.0 if not present
+
+        // Set loan due date to the last day of the month, 3 months after loan confirmation
+        DateTime now = DateTime.now();
+        DateTime threeMonthsLater = DateTime(now.year, now.month + 3, 1);
+        repaymentDueDate =
+            DateTime(threeMonthsLater.year, threeMonthsLater.month, 0);
+      });
+    } catch (e) {
+      print('Error fetching borrower data: $e');
+    }
+  }
+
+  Future<void> _generateTransactionReference() async {
+    // Generate a transaction reference, like a random number or unique ID
+    setState(() {
+      transactionReference = DateTime.now().millisecondsSinceEpoch.toString();
+    });
+  }
 
   Future<Map<String, dynamic>> _fetchGroupData() async {
     try {
@@ -31,7 +85,6 @@ class _ApplyForLoanPageState extends State<ApplyForLoanPage> {
           .collection('groups')
           .doc(widget.groupId)
           .get();
-      double interestRate = (groupSnapshot['interestRate'] ?? 0.0).toDouble() / 100;
 
       QuerySnapshot confirmedPayments = await FirebaseFirestore.instance
           .collection('groups')
@@ -40,25 +93,25 @@ class _ApplyForLoanPageState extends State<ApplyForLoanPage> {
           .where('status', isEqualTo: 'confirmed')
           .get();
 
-      double availableBalance = 0.0;
-
-      for (var doc in confirmedPayments.docs) {
-        String paymentType = doc['paymentType'];
-        if (paymentType == 'Monthly Contribution' || paymentType == 'Loan Repayment' || paymentType == 'Penalty Fee') {
-          availableBalance += (doc['amount'] ?? 0.0).toDouble();
+      double availableBalance = confirmedPayments.docs.fold(0.0, (sum, doc) {
+        if (['Monthly Contribution', 'Loan Repayment', 'Penalty Fee']
+            .contains(doc['paymentType'])) {
+          return sum + (doc['amount'] ?? 0.0).toDouble();
         }
-      }
+        return sum;
+      });
+
+      // Fetch loanPenalty from group data
+      double loanPenalty = (groupSnapshot['loanPenalty'] ?? 0.0).toDouble();
 
       return {
         'availableBalance': availableBalance,
-        'interestRate': interestRate,
+        'interestRate': groupSnapshot['interestRate']?.toDouble() ?? 0.0,
+        'loanPenalty': loanPenalty, // Keep loanPenalty as the field name
       };
     } catch (e) {
       print('Error fetching group data: $e');
-      return {
-        'availableBalance': 0.0,
-        'interestRate': 0.0,
-      };
+      return {'availableBalance': 0.0, 'interestRate': 0.0, 'loanPenalty': 0.0};
     }
   }
 
@@ -68,7 +121,17 @@ class _ApplyForLoanPageState extends State<ApplyForLoanPage> {
 
     if (loanAmountStr.isEmpty || parsedAmount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please enter a valid loan amount greater than zero')),
+        SnackBar(
+            content:
+                Text('Please enter a valid loan amount greater than zero')),
+      );
+      return;
+    }
+
+    if (repaymentDueDate == null || borrowerName == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Please wait while we fetch borrower information.')),
       );
       return;
     }
@@ -80,15 +143,24 @@ class _ApplyForLoanPageState extends State<ApplyForLoanPage> {
 
       if (parsedAmount > availableBalance) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Loan amount cannot exceed the available group balance of MWK $availableBalance')),
+          SnackBar(
+              content: Text(
+                  'Loan amount cannot exceed the available group balance of MWK $availableBalance')),
         );
         return;
       }
 
-      double totalWithInterest = parsedAmount * (1 + interestRate);
-      double monthlyRepayment = totalWithInterest / 3;  // Example: repay over 3 months
-      DateTime now = DateTime.now();
-      DateTime dueDate = DateTime(now.year, now.month + 3, 0);  // 3 months from now
+      // Corrected logic for outstanding balance: confirmed loan + interest + penalty - repayments
+      double totalWithInterestAndPenalty =
+          parsedAmount * (1 + interestRate / 100);
+      if (groupData['loanPenalty'] != null && groupData['loanPenalty'] > 0) {
+        totalWithInterestAndPenalty +=
+            parsedAmount * (groupData['loanPenalty'] / 100);
+      }
+
+      // Calculate the monthly repayment for the loan
+      double monthlyRepayment =
+          totalWithInterestAndPenalty / widget.repaymentPeriod;
 
       var loanQuerySnapshot = await FirebaseFirestore.instance
           .collection('groups')
@@ -106,15 +178,18 @@ class _ApplyForLoanPageState extends State<ApplyForLoanPage> {
 
         await loanDocument.set({
           'userId': widget.userId,
+          'borrowerName': borrowerName, // Include borrower's name as borrowerName
           'amount': parsedAmount,
-          'interestRate': interestRate * 100,
-          'totalWithInterest': totalWithInterest,
+          'interestRate': interestRate, // Interest rate is already a percentage
+          'totalWithInterest': totalWithInterestAndPenalty,
           'monthlyRepayment': monthlyRepayment,
           'status': 'pending',
           'appliedAt': Timestamp.now(),
-          'dueDate': Timestamp.fromDate(dueDate),
+          'dueDate': Timestamp.fromDate(repaymentDueDate!), // Set due date
           'repaymentPeriod': widget.repaymentPeriod,
-          'outstandingBalance': totalWithInterest,
+          'outstandingBalance': totalWithInterestAndPenalty,
+          'loanPenalty': groupData['loanPenalty'] ?? 0.0, // Store loanPenalty as percentage in the loan collection
+          'transactionReference': transactionReference, // Add the transaction reference here
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -149,6 +224,13 @@ class _ApplyForLoanPageState extends State<ApplyForLoanPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (borrowerName != null) ...[
+              Text(
+                'Borrower: $borrowerName',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 10),
+            ],
             FutureBuilder<Map<String, dynamic>>(
               future: _fetchGroupData(),
               builder: (context, snapshot) {
@@ -164,19 +246,39 @@ class _ApplyForLoanPageState extends State<ApplyForLoanPage> {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
+                                            Text(
                         'Available Balance to Borrow: MWK ${availableBalance.toStringAsFixed(2)}',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                       SizedBox(height: 10),
                       Text(
-                        'Interest Rate: ${(interestRate * 100).toStringAsFixed(2)}%',
+                        'Interest Rate: ${interestRate.toStringAsFixed(2)}%',
                         style: TextStyle(fontSize: 16, color: Colors.black),
                       ),
+                      if (loanPenalty != null && loanPenalty! > 0)
+                        Text(
+                          'Loan Penalty: ${loanPenalty!.toStringAsFixed(2)}% if late payment',
+                          style: TextStyle(fontSize: 16, color: Colors.red),
+                        ),
+                      if (repaymentDueDate != null)
+                        Text(
+                          'Repayment Due Date: ${repaymentDueDate!.toLocal().toString().split(' ')[0]}',
+                          style: TextStyle(fontSize: 16, color: Colors.black),
+                        ),
                       SizedBox(height: 10),
                       Text(
-                        'The loan repayment will be divided equally for the next 3 months with the interest rate included.',
+                        'The loan repayment will be divided equally over ${widget.repaymentPeriod} months with the interest rate and loan penalty included.',
                         style: TextStyle(fontSize: 14, color: Colors.black54),
+                      ),
+                      SizedBox(height: 20),
+                      Text(
+                        'Transaction Reference: $transactionReference',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blueGrey,
+                        ),
                       ),
                     ],
                   );

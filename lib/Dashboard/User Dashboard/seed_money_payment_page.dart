@@ -22,11 +22,15 @@ class _SeedMoneyPaymentPageState extends State<SeedMoneyPaymentPage> {
   double? seedMoneyAmount;
   double? totalOwed;
   bool _isSubmitting = false;
+  String? selectedReference; // Define selectedReference here
 
   @override
   void initState() {
     super.initState();
     _fetchData();
+    final currentYear = DateFormat('yyyy').format(DateTime.now());
+    final currentMonth = DateFormat('MMMM').format(DateTime.now());
+    selectedReference = 'Seed Money - $currentMonth $currentYear'; // Initialize selectedReference
   }
 
   Future<void> _fetchData() async {
@@ -185,12 +189,54 @@ class _SeedMoneyPaymentPageState extends State<SeedMoneyPaymentPage> {
     );
   }
 
-  Widget _buildTransactionReferenceSection() {
-    return TextField(
-      controller: _transactionReferenceController,
-      decoration: InputDecoration(labelText: 'Enter Transaction Reference'),
-    );
-  }
+Widget _buildTransactionReferenceSection() {
+  final currentYear = DateFormat('yyyy').format(DateTime.now());
+  final currentMonth = DateFormat('MMMM').format(DateTime.now());
+
+  List<String> referenceOptions = [
+    'Seed Money - $currentMonth $currentYear',
+    'Seed Money - Custom',
+  ];
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Text(
+        'Transaction Reference:',
+        style: TextStyle(fontWeight: FontWeight.bold),
+      ),
+      SizedBox(height: 8),
+      DropdownButton<String>(
+        value: selectedReference,
+        onChanged: (String? newValue) {
+          setState(() {
+            selectedReference = newValue;
+
+            // If 'Custom' is selected, show the custom reference text field
+            if (newValue != null && newValue == 'Seed Money - Custom') {
+              _transactionReferenceController.clear();
+            } else {
+              _transactionReferenceController.text = newValue!;
+            }
+          });
+        },
+        items: referenceOptions.map<DropdownMenuItem<String>>((String value) {
+          return DropdownMenuItem<String>(
+            value: value,
+            child: Text(value),
+          );
+        }).toList(),
+      ),
+      if (selectedReference == 'Seed Money - Custom') ...[
+        SizedBox(height: 8),
+        TextField(
+          controller: _transactionReferenceController,
+          decoration: InputDecoration(labelText: 'Enter Custom Reference'),
+        ),
+      ],
+    ],
+  );
+}
 
   Widget _buildScreenshotButton() {
     return OutlinedButton.icon(

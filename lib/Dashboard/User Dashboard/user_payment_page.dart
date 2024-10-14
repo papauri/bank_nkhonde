@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'user_submit_payment_logic.dart';
+import 'package:intl/intl.dart';  // For date formatting
 
 class PaymentPage extends StatefulWidget {
   final String groupId;
@@ -16,20 +17,20 @@ class PaymentPage extends StatefulWidget {
 
 class _PaymentPageState extends State<PaymentPage> {
   final TextEditingController _amountController = TextEditingController();
-  final TextEditingController _transactionReferenceController = TextEditingController();
+  final TextEditingController _customReferenceController = TextEditingController();
   String? selectedPaymentType = 'Monthly Contribution';
   String? payerName = 'Unknown User';
   File? _screenshotFile;
   double? fixedMonthlyAmount;
   double? totalOwed;
   bool _isSubmitting = false;
+  String? selectedReference;
 
   @override
   void initState() {
     super.initState();
     _fetchUserName();
     _fetchGroupDetails();
-    _calculateTotalOwed();
   }
 
   Future<void> _fetchUserName() async {
@@ -58,6 +59,7 @@ class _PaymentPageState extends State<PaymentPage> {
     if (groupDoc.exists) {
       setState(() {
         fixedMonthlyAmount = groupDoc['fixedAmount']?.toDouble() ?? 0.0;
+        _calculateTotalOwed();  // Calculate total owed after fetching group details
       });
     }
   }
@@ -82,10 +84,10 @@ class _PaymentPageState extends State<PaymentPage> {
       }
 
       // Calculate total owed for monthly contribution
-      double totalOwed = fixedMonthlyAmount! - totalPaid;
-
       setState(() {
-        this.totalOwed = totalOwed > 0 ? totalOwed : 0.0;
+        totalOwed = (fixedMonthlyAmount != null && totalPaid != null) 
+          ? (fixedMonthlyAmount! - totalPaid)
+          : 0.0;
       });
     } catch (e) {
       print('Error calculating total owed: $e');
@@ -103,7 +105,9 @@ class _PaymentPageState extends State<PaymentPage> {
 
   Future<void> _submitPayment() async {
     double? amount = double.tryParse(_amountController.text.trim());
-    String transactionReference = _transactionReferenceController.text.trim();
+    String transactionReference = selectedReference == 'Custom'
+        ? _customReferenceController.text.trim()
+        : selectedReference ?? '';
 
     // Check if all mandatory fields are filled
     if (amount == null || amount <= 0) {
@@ -203,7 +207,7 @@ class _PaymentPageState extends State<PaymentPage> {
         TextButton(
           onPressed: () {
             setState(() {
-              _amountController.text = totalOwed!.toStringAsFixed(2); // Auto-populate the total owed
+              _amountController.text = totalOwed?.toStringAsFixed(2) ?? '0.00'; // Auto-populate with valid value
             });
           },
           child: Text('Auto-Populate Total Owed'),
@@ -212,11 +216,45 @@ class _PaymentPageState extends State<PaymentPage> {
       ],
     );
   }
-
   Widget _buildTransactionReferenceSection() {
-    return TextField(
-      controller: _transactionReferenceController,
-      decoration: InputDecoration(labelText: 'Enter Transaction Reference'),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Transaction Reference',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        SizedBox(height: 8),
+        DropdownButton<String>(
+          value: selectedReference,
+          hint: Text('Select a reference or enter custom'),
+          onChanged: (String? newValue) {
+            setState(() {
+              selectedReference = newValue;
+              if (selectedReference != 'Custom') {
+                _customReferenceController.clear(); // Clear custom reference when a predefined one is selected
+              }
+            });
+          },
+          items: <String>[
+            'Payment for ${DateFormat('MMMM yyyy').format(DateTime.now())}', // Dynamic current month reference
+            'Loan Repayment',
+            'Penalty Payment',
+            'Custom', // Option for entering a custom reference
+          ].map<DropdownMenuItem<String>>((String value) {
+            return DropdownMenuItem<String>(
+              value: value,
+              child: Text(value),
+            );
+          }).toList(),
+        ),
+        if (selectedReference == 'Custom')
+          TextField(
+            controller: _customReferenceController,
+            decoration: InputDecoration(labelText: 'Enter Custom Transaction Reference'),
+          ),
+        SizedBox(height: 8),
+      ],
     );
   }
 
@@ -241,21 +279,23 @@ class _PaymentPageState extends State<PaymentPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('Make a Payment')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildPaymentTypeSection(),
-            SizedBox(height: 20),
-            _buildAmountSection(),
-            SizedBox(height: 20),
-            _buildTransactionReferenceSection(),
-            SizedBox(height: 20),
-            _buildScreenshotButton(),
-            SizedBox(height: 20),
-            _buildSubmitButton(),
-          ],
+      body: SingleChildScrollView( // Wrap in SingleChildScrollView to prevent overflow
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildPaymentTypeSection(),
+              SizedBox(height: 20),
+              _buildAmountSection(),
+              SizedBox(height: 20),
+              _buildTransactionReferenceSection(), // Updated section
+              SizedBox(height: 20),
+              _buildScreenshotButton(),
+              SizedBox(height: 20),
+              _buildSubmitButton(),
+            ],
+          ),
         ),
       ),
     );

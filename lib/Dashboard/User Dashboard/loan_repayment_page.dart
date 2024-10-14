@@ -27,8 +27,8 @@ class LoanRepaymentPage extends StatefulWidget {
 class _LoanRepaymentPageState extends State<LoanRepaymentPage> {
   double monthlyPayment = 0.0;
   double outstandingLoanBalance = 0.0;
+  String? transactionReference; // To store the loan transaction reference
   TextEditingController _paymentController = TextEditingController();
-  TextEditingController _referenceController = TextEditingController();
   TextEditingController _noteController = TextEditingController();
   File? _paymentScreenshot; // File for payment screenshot
 
@@ -36,6 +36,7 @@ class _LoanRepaymentPageState extends State<LoanRepaymentPage> {
   void initState() {
     super.initState();
     _calculateLoanDetails();
+    _fetchTransactionReference(); // Fetch the existing transaction reference
   }
 
   void _calculateLoanDetails() {
@@ -52,6 +53,23 @@ class _LoanRepaymentPageState extends State<LoanRepaymentPage> {
     _paymentController.text = monthlyPayment.toStringAsFixed(2);
   }
 
+  Future<void> _fetchTransactionReference() async {
+    // Fetch the loan document for the user to get the transaction reference
+    QuerySnapshot loanQuerySnapshot = await FirebaseFirestore.instance
+        .collection('groups')
+        .doc(widget.groupId)
+        .collection('loans')
+        .where('userId', isEqualTo: widget.userId)
+        .limit(1)
+        .get();
+
+    if (loanQuerySnapshot.docs.isNotEmpty) {
+      setState(() {
+        transactionReference = loanQuerySnapshot.docs.first['transactionReference'];
+      });
+    }
+  }
+
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
@@ -65,10 +83,9 @@ class _LoanRepaymentPageState extends State<LoanRepaymentPage> {
 
   Future<void> _makePayment() async {
     double paymentAmount = double.tryParse(_paymentController.text) ?? 0.0;
-    String referenceNumber = _referenceController.text.trim();
     String noteToAdmin = _noteController.text.trim();
 
-    if (paymentAmount > 0 && referenceNumber.isNotEmpty) {
+    if (paymentAmount > 0 && transactionReference != null) {
       try {
         // Check if the loan document exists
         QuerySnapshot loanQuerySnapshot = await FirebaseFirestore.instance
@@ -103,7 +120,7 @@ class _LoanRepaymentPageState extends State<LoanRepaymentPage> {
         });
 
         // Add payment record with status 'pending'
-        DocumentReference paymentRef = await FirebaseFirestore.instance
+        await FirebaseFirestore.instance
             .collection('groups')
             .doc(widget.groupId)
             .collection('payments')
@@ -113,7 +130,7 @@ class _LoanRepaymentPageState extends State<LoanRepaymentPage> {
           'amount': paymentAmount,
           'status': 'pending', // Payment pending approval
           'paymentDate': Timestamp.now(),
-          'referenceNumber': referenceNumber,
+          'referenceNumber': transactionReference, // Use the existing transaction reference
           'note': noteToAdmin,
           'screenshot': _paymentScreenshot != null ? await _uploadScreenshot() : null,
         });
@@ -172,19 +189,17 @@ class _LoanRepaymentPageState extends State<LoanRepaymentPage> {
               ],
             ),
             SizedBox(height: 20),
+            if (transactionReference != null)
+              Text(
+                'Transaction Reference: $transactionReference',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blueGrey),
+              ),
+            SizedBox(height: 16),
             TextField(
               controller: _paymentController,
               keyboardType: TextInputType.numberWithOptions(decimal: true),
               decoration: InputDecoration(
                 labelText: 'Payment Amount',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            SizedBox(height: 16),
-            TextField(
-              controller: _referenceController,
-              decoration: InputDecoration(
-                labelText: 'Reference Number',
                 border: OutlineInputBorder(),
               ),
             ),

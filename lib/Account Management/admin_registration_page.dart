@@ -22,8 +22,10 @@ class _RegistrationPageState extends State<RegistrationPage> {
   final TextEditingController _seedMoneyController = TextEditingController();
   final TextEditingController _interestRateController = TextEditingController();
   final TextEditingController _monthlyContributionController = TextEditingController();
-  final TextEditingController _quarterlyPaymentController = TextEditingController(); // New field for quarterly payments
-  DateTime? _quarterlyStartDate; // New field for quarterly payment start date
+  final TextEditingController _loanPenaltyController = TextEditingController();  // Loan penalty
+  final TextEditingController _monthlyPenaltyController = TextEditingController();  // Monthly contribution penalty
+  final TextEditingController _quarterlyPaymentController = TextEditingController(); // Optional quarterly payments
+  DateTime? _quarterlyStartDate;
 
   bool isLoading = false;
   String errorMessage = '';
@@ -43,23 +45,12 @@ class _RegistrationPageState extends State<RegistrationPage> {
     _invitationCodeController.text = generatedCode;
 
     try {
-      QuerySnapshot snapshot = await _db.collection('invitationCodes').limit(1).get();
-
-      if (snapshot.docs.isEmpty) {
-        await _db.collection('invitationCodes').add({
-          'code': generatedCode,
-          'approved': false,
-          'used': false,
-          'createdAt': Timestamp.now(),
-        });
-      } else {
-        await _db.collection('invitationCodes').add({
-          'code': generatedCode,
-          'approved': false,
-          'used': false,
-          'createdAt': Timestamp.now(),
-        });
-      }
+      await _db.collection('invitationCodes').add({
+        'code': generatedCode,
+        'approved': false,
+        'used': false,
+        'createdAt': Timestamp.now(),
+      });
     } catch (e) {
       setState(() {
         errorMessage = 'Failed to generate invitation code. Please try again later.';
@@ -71,8 +62,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
     const length = 8;
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     Random random = Random();
-    return String.fromCharCodes(Iterable.generate(
-        length, (_) => chars.codeUnitAt(random.nextInt(chars.length))));
+    return String.fromCharCodes(
+        Iterable.generate(length, (_) => chars.codeUnitAt(random.nextInt(chars.length))));
   }
 
   @override
@@ -95,24 +86,14 @@ class _RegistrationPageState extends State<RegistrationPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(height: 80),
-          Icon(
-            Icons.account_circle,
-            size: 80,
-            color: Colors.grey[700],
-          ),
+          Icon(Icons.account_circle, size: 80, color: Colors.grey[700]),
           SizedBox(height: 20),
           Text(
             'Admin Registration',
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
-            ),
+            style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.grey[800]),
             textAlign: TextAlign.center,
           ),
           SizedBox(height: 40),
-
-          // Name, Phone, Email, Password fields
           _buildTextField(_nameController, 'Full Name', Icons.person_outline),
           SizedBox(height: 20),
           _buildTextField(_phoneController, 'Phone Number', Icons.phone),
@@ -121,11 +102,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
           SizedBox(height: 20),
           _buildTextField(_passwordController, 'Password', Icons.lock_outline, obscureText: true),
           SizedBox(height: 40),
-
-          // Invitation Code field (read-only)
           _buildTextField(_invitationCodeController, 'Invitation Code', Icons.vpn_key, readOnly: true),
-
-          // Checkbox for Group creation option
           CheckboxListTile(
             title: Text('Create a Group Now'),
             value: createGroup,
@@ -144,13 +121,15 @@ class _RegistrationPageState extends State<RegistrationPage> {
             SizedBox(height: 20),
             _buildTextField(_monthlyContributionController, 'Monthly Contribution (MWK)', Icons.attach_money),
             SizedBox(height: 20),
+            _buildTextField(_loanPenaltyController, 'Loan Late Payment Penalty (%)', Icons.warning_amber_rounded),
+            SizedBox(height: 20),
+            _buildTextField(_monthlyPenaltyController, 'Monthly Late Payment Penalty (%)', Icons.warning_amber_rounded),
+            SizedBox(height: 20),
             _buildTextField(_quarterlyPaymentController, 'Quarterly Payment (MWK) - Optional', Icons.attach_money),
             SizedBox(height: 20),
             _buildDatePickerField('Quarterly Payment Start Date - Optional'),
             SizedBox(height: 40),
           ],
-
-          // Register Button
           ElevatedButton(
             onPressed: _registerAdmin,
             style: ElevatedButton.styleFrom(
@@ -160,13 +139,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            child: Text(
-              'Register',
-              style: TextStyle(fontSize: 18, color: Colors.white),
-            ),
+            child: Text('Register', style: TextStyle(fontSize: 18, color: Colors.white)),
           ),
-
-          // Error Message
           if (errorMessage.isNotEmpty)
             Padding(
               padding: const EdgeInsets.all(8.0),
@@ -278,15 +252,13 @@ class _RegistrationPageState extends State<RegistrationPage> {
       User? user = userCredential.user;
 
       if (user != null) {
-        String defaultIcon = 'account_circle';
-
         await _db.collection('users').doc(user.uid).set({
-          'userId': user.uid,
+                    'userId': user.uid,
           'name': name,
           'email': email,
           'phone': phone,
           'role': 'admin',
-          'profilePicture': defaultIcon,
+          'profilePicture': 'account_circle',
           'createdAt': Timestamp.now(),
         });
 
@@ -321,6 +293,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
     double interestRate = double.tryParse(_interestRateController.text.trim()) ?? 0.0;
     double monthlyContribution = double.tryParse(_monthlyContributionController.text.trim()) ?? 0.0;
     double? quarterlyPayment = double.tryParse(_quarterlyPaymentController.text.trim());
+    double? loanPenalty = double.tryParse(_loanPenaltyController.text.trim()) ?? 0.0;  // Loan penalty
+    double? monthlyPenalty = double.tryParse(_monthlyPenaltyController.text.trim()) ?? 0.0;  // Monthly contribution penalty
 
     // Calculate the next due date based on the quarterly start date
     DateTime? nextDueDate;
@@ -335,6 +309,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
       'interestRate': interestRate,
       'fixedAmount': monthlyContribution,
       'quarterlyPaymentAmount': quarterlyPayment,
+      'loanPenalty': loanPenalty,  // Adding loan penalty field
+      'monthlyPenalty': monthlyPenalty,  // Adding monthly contribution penalty field
       'nextDueDate': nextDueDate != null ? Timestamp.fromDate(nextDueDate) : null,
       'createdAt': Timestamp.now(),
       'totalContributions': 0.0,

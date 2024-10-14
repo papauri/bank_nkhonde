@@ -1,24 +1,22 @@
 import 'package:flutter/material.dart';
 
 class GroupStatsList extends StatelessWidget {
-  final double totalContributions;
-  final double pendingLoanAmount;
   final int pendingLoanApplicants;
   final int pendingPaymentsCount;
   final double seedMoney;
   final double interestRate;
   final double fixedAmount;
   final Function onStatTapped;
+  final Function onViewMembers;
 
   const GroupStatsList({
-    required this.totalContributions,
-    required this.pendingLoanAmount,
     required this.pendingLoanApplicants,
     required this.pendingPaymentsCount,
     required this.seedMoney,
     required this.interestRate,
     required this.fixedAmount,
     required this.onStatTapped,
+    required this.onViewMembers,
   });
 
   @override
@@ -33,30 +31,28 @@ class GroupStatsList extends StatelessWidget {
             children: [
               _buildClickableTile(
                 context,
-                title: 'Contributions',
-                value: 'MWK ${totalContributions.toStringAsFixed(2)}',
-                icon: Icons.attach_money,
-                onTap: () => onStatTapped('contributions'),
+                title: 'View Members',
+                value: 'Manage Members',
+                icon: Icons.group,
+                onTap: () => onViewMembers(),
               ),
               _buildClickableTile(
                 context,
                 title: 'Loans',
-                value: 'MWK ${pendingLoanAmount.toStringAsFixed(2)}',
-                subtitle: '$pendingLoanApplicants Applicants',
+                value: '$pendingLoanApplicants Pending', // Display pending applicants
                 icon: Icons.hourglass_empty,
                 onTap: () => onStatTapped('loans'),
               ),
               _buildClickableTile(
                 context,
                 title: 'Payments',
-                value: '$pendingPaymentsCount Pending',
+                value: '$pendingPaymentsCount Pending', // Display pending payments count
                 icon: Icons.payment,
                 onTap: () => onStatTapped('pending_payments'),
               ),
             ],
           ),
           const SizedBox(height: 20),
-          // Informative section
           _buildDropdownInfoSection(context),
         ],
       ),
@@ -68,7 +64,6 @@ class GroupStatsList extends StatelessWidget {
     required String title,
     required String value,
     IconData? icon,
-    String? subtitle,
     Function()? onTap,
   }) {
     return GestureDetector(
@@ -108,12 +103,6 @@ class GroupStatsList extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            if (subtitle != null)
-              Text(
-                subtitle,
-                style: TextStyle(fontSize: 10, color: Colors.black54),
-                textAlign: TextAlign.center,
-              ),
           ],
         ),
       ),

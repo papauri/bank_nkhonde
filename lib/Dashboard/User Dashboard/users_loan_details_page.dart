@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'loan_repayment_page.dart'; // Assuming you have this page
+import 'loan_repayment_page.dart';
+import 'loan_history_page.dart'; // Create this page
 
 class UsersLoanDetailsPage extends StatefulWidget {
   final String groupId;
@@ -14,6 +15,41 @@ class UsersLoanDetailsPage extends StatefulWidget {
 }
 
 class _UsersLoanDetailsPageState extends State<UsersLoanDetailsPage> {
+  int _selectedIndex = 0;
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+    switch (index) {
+      case 0:
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => LoanHistoryPage(
+              groupId: widget.groupId,
+              userId: widget.userId,
+            ),
+          ),
+        );
+        break;
+      case 1:
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => UsersLoanDetailsPage(
+              groupId: widget.groupId,
+              userId: widget.userId,
+            ),
+          ),
+        );
+        break;
+      case 2:
+        Navigator.pop(context); // Assuming dashboard is the previous screen
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -52,130 +88,107 @@ class _UsersLoanDetailsPageState extends State<UsersLoanDetailsPage> {
               final String status = loanData['status'] ?? 'Pending';
               final int repaymentPeriod = loanData['repaymentPeriod'] ?? 3;
               final double outstandingBalance = (loanData['outstandingBalance'] ?? loanAmount).toDouble();
-              final DateTime applicationDate = (loanData['appliedAt'] != null)
-                  ? (loanData['appliedAt'] as Timestamp).toDate()
-                  : DateTime.now();
-              
-              // Calculate Next Payment Date or fallback to last day of current month
-              DateTime nextPaymentDate = (loanData['nextPaymentDueDate'] != null)
-                  ? (loanData['nextPaymentDueDate'] as Timestamp).toDate()
-                  : DateTime(applicationDate.year, applicationDate.month + 1, 0);  // Last day of next month
-              
-              // Calculate Final Due Date: Based on either admin-specified date or the repayment period
-              DateTime finalDueDate = (loanData['finalDueDate'] != null)
-                  ? (loanData['finalDueDate'] as Timestamp).toDate()
-                  : DateTime(applicationDate.year, applicationDate.month + repaymentPeriod, 0); // Last day of final month
+              final DateTime applicationDate = (loanData['appliedAt'] as Timestamp?)?.toDate() ?? DateTime.now();
+
+              // Calculate due dates
+              DateTime nextPaymentDate = (loanData['nextPaymentDueDate'] as Timestamp?)?.toDate() ?? DateTime(applicationDate.year, applicationDate.month + 1, 0);
+              DateTime finalDueDate = (loanData['finalDueDate'] as Timestamp?)?.toDate() ?? DateTime(applicationDate.year, applicationDate.month + repaymentPeriod, 0);
 
               final String totalPayable = (loanAmount * (1 + interestRate / 100)).toStringAsFixed(2);
               final String monthlyRepayment = (loanAmount * (1 + interestRate / 100) / repaymentPeriod).toStringAsFixed(2);
 
-              return Card(
-                elevation: 4,
-                margin: const EdgeInsets.symmetric(vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Outstanding Balance
-                      Text(
-                        'Outstanding Balance: MWK ${outstandingBalance.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: outstandingBalance > 0 ? Colors.redAccent : Colors.green,
+              return GestureDetector(
+                onTap: () {
+                  if (outstandingBalance > 0) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => LoanRepaymentPage(
+                          groupId: widget.groupId,
+                          userId: widget.userId,
+                          loanAmount: loanAmount,
+                          interestRate: interestRate,
+                          repaymentPeriod: repaymentPeriod,
+                          outstandingBalance: outstandingBalance,
                         ),
                       ),
-                      SizedBox(height: 10),
-
-                      // Next Payment Date
-                      Text(
-                        'Next Payment Due: ${DateFormat('dd MMM yyyy').format(nextPaymentDate)}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blueAccent,
+                    );
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => LoanHistoryPage(
+                          groupId: widget.groupId,
+                          userId: widget.userId,
                         ),
                       ),
-                      SizedBox(height: 10),
-
-                      // Loan Amount
-                      Text(
-                        'Loan Amount: MWK ${loanAmount.toStringAsFixed(2)}',
-                        style: TextStyle(fontSize: 16),
-                      ),
-                      SizedBox(height: 10),
-
-                      // Interest Rate
-                      Text(
-                        'Interest Rate: ${interestRate.toStringAsFixed(2)}%',
-                        style: TextStyle(fontSize: 16),
-                      ),
-                      SizedBox(height: 10),
-
-                      // Total Payable
-                      Text(
-                        'Total Payable: MWK $totalPayable',
-                        style: TextStyle(fontSize: 16),
-                      ),
-                      SizedBox(height: 10),
-
-                      // Monthly Repayment
-                      Text(
-                        'Monthly Repayment ($repaymentPeriod months): MWK $monthlyRepayment',
-                        style: TextStyle(fontSize: 16),
-                      ),
-                      SizedBox(height: 10),
-
-                      // Final Due Date
-                      Text(
-                        'Final Due Date: ${DateFormat('dd MMM yyyy').format(finalDueDate)}',
-                        style: TextStyle(fontSize: 16, color: Colors.redAccent),
-                      ),
-                      SizedBox(height: 10),
-
-                      // Loan Status
-                      Text(
-                        'Status: $status',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: status == 'approved' ? Colors.green : Colors.redAccent,
-                          fontWeight: FontWeight.bold,
+                    );
+                  }
+                },
+                child: Card(
+                  elevation: 2,
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildDetailRow('Outstanding Balance', 'MWK ${outstandingBalance.toStringAsFixed(2)}', outstandingBalance > 0 ? Colors.redAccent : Colors.green),
+                        _buildDetailRow('Next Payment Due', DateFormat('dd MMM yyyy').format(nextPaymentDate), Colors.blueAccent),
+                        _buildDetailRow('Loan Amount', 'MWK ${loanAmount.toStringAsFixed(2)}'),
+                        _buildDetailRow('Interest Rate', '${interestRate.toStringAsFixed(2)}%'),
+                        _buildDetailRow('Total Payable', 'MWK $totalPayable'),
+                        _buildDetailRow('Monthly Repayment', 'MWK $monthlyRepayment'),
+                        _buildDetailRow('Final Due Date', DateFormat('dd MMM yyyy').format(finalDueDate), Colors.redAccent),
+                        _buildDetailRow('Status', status, status == 'approved' ? Colors.green : Colors.redAccent),
+                        SizedBox(height: 10),
+                        Text(
+                          outstandingBalance > 0 ? 'Tap for Loan Payments' : 'Tap for Loan History',
+                          style: TextStyle(fontSize: 14, color: Colors.grey[600], fontStyle: FontStyle.italic),
+                          textAlign: TextAlign.center,
                         ),
-                      ),
-                      SizedBox(height: 10),
-
-                      // Make a Payment Button
-                      ElevatedButton(
-                        onPressed: () {
-                          // Navigate to LoanRepaymentPage with relevant loan data
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => LoanRepaymentPage(
-                                groupId: widget.groupId,
-                                userId: widget.userId,
-                                loanAmount: loanAmount,
-                                interestRate: interestRate,
-                                repaymentPeriod: repaymentPeriod,
-                                outstandingBalance: outstandingBalance,
-                              ),
-                            ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.teal, // Button color
-                        ),
-                        child: Text('Make a Loan Repayment'),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               );
             },
           );
         },
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.history),
+            label: 'Loan History',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.payment),
+            label: 'Repayments',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard),
+            label: 'Dashboard',
+          ),
+        ],
+        currentIndex: _selectedIndex,
+        selectedItemColor: Colors.black,
+        unselectedItemColor: Colors.grey,
+        onTap: _onItemTapped,
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, [Color? color]) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(fontSize: 16, color: Colors.black)),
+          Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color ?? Colors.black)),
+        ],
       ),
     );
   }
