@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'loan_repayment_page.dart';
-import 'loan_history_page.dart'; // Create this page
+import 'loan_history_page.dart';
+import 'users_loan_repayment_page.dart';
 
 class UsersLoanDetailsPage extends StatefulWidget {
   final String groupId;

@@ -1,7 +1,7 @@
-import 'package:bank_nkhonde/Login%20Page/login_page.dart'; // Handles login and registration
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
+import 'splash_screen.dart'; // Import your splash screen
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,7 +18,7 @@ class BankNkhondeApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.green, // Theme settings
       ),
-      home: LoginPage(), // Navigates to the LoginPage
+      home: SplashScreen(), // Set SplashScreen as the initial screen
     );
   }
 }

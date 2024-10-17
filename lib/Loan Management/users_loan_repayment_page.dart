@@ -27,34 +27,25 @@ class LoanRepaymentPage extends StatefulWidget {
 class _LoanRepaymentPageState extends State<LoanRepaymentPage> {
   double monthlyPayment = 0.0;
   double outstandingLoanBalance = 0.0;
-  String? transactionReference; // To store the loan transaction reference
+  String? transactionReference;
   TextEditingController _paymentController = TextEditingController();
-  TextEditingController _noteController = TextEditingController();
-  File? _paymentScreenshot; // File for payment screenshot
+  File? _paymentScreenshot;
 
   @override
   void initState() {
     super.initState();
     _calculateLoanDetails();
-    _fetchTransactionReference(); // Fetch the existing transaction reference
+    _fetchTransactionReference();
   }
 
   void _calculateLoanDetails() {
-    // Calculate total loan including interest
     double totalLoan = widget.loanAmount * (1 + widget.interestRate / 100);
-    
-    // Calculate the monthly payment based on repayment period
     monthlyPayment = totalLoan / widget.repaymentPeriod;
-
-    // Set the initial outstanding loan balance
     outstandingLoanBalance = widget.outstandingBalance;
-    
-    // Autofill the payment field with the calculated monthly payment
     _paymentController.text = monthlyPayment.toStringAsFixed(2);
   }
 
   Future<void> _fetchTransactionReference() async {
-    // Fetch the loan document for the user to get the transaction reference
     QuerySnapshot loanQuerySnapshot = await FirebaseFirestore.instance
         .collection('groups')
         .doc(widget.groupId)
@@ -83,11 +74,9 @@ class _LoanRepaymentPageState extends State<LoanRepaymentPage> {
 
   Future<void> _makePayment() async {
     double paymentAmount = double.tryParse(_paymentController.text) ?? 0.0;
-    String noteToAdmin = _noteController.text.trim();
 
     if (paymentAmount > 0 && transactionReference != null) {
       try {
-        // Check if the loan document exists
         QuerySnapshot loanQuerySnapshot = await FirebaseFirestore.instance
             .collection('groups')
             .doc(widget.groupId)
@@ -106,20 +95,7 @@ class _LoanRepaymentPageState extends State<LoanRepaymentPage> {
         DocumentSnapshot loanDocSnapshot = loanQuerySnapshot.docs.first;
         String loanDocId = loanDocSnapshot.id;
 
-        // Update the outstanding loan balance in Firestore (mark payment as pending approval)
-        double updatedOutstandingBalance = outstandingLoanBalance - paymentAmount;
-
-        await FirebaseFirestore.instance
-            .collection('groups')
-            .doc(widget.groupId)
-            .collection('loans')
-            .doc(loanDocId)
-            .update({
-          'outstandingBalance': updatedOutstandingBalance,
-          'withstandingPayments': FieldValue.increment(paymentAmount),
-        });
-
-        // Add payment record with status 'pending'
+        // Add payment record with status 'pending' for admin approval
         await FirebaseFirestore.instance
             .collection('groups')
             .doc(widget.groupId)
@@ -130,13 +106,8 @@ class _LoanRepaymentPageState extends State<LoanRepaymentPage> {
           'amount': paymentAmount,
           'status': 'pending', // Payment pending approval
           'paymentDate': Timestamp.now(),
-          'referenceNumber': transactionReference, // Use the existing transaction reference
-          'note': noteToAdmin,
+          'referenceNumber': transactionReference,
           'screenshot': _paymentScreenshot != null ? await _uploadScreenshot() : null,
-        });
-
-        setState(() {
-          outstandingLoanBalance = updatedOutstandingBalance;
         });
 
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -150,14 +121,13 @@ class _LoanRepaymentPageState extends State<LoanRepaymentPage> {
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Please fill in a valid payment amount and reference number'),
+        content: Text('Please fill in a valid payment amount.'),
       ));
     }
   }
 
   Future<String> _uploadScreenshot() async {
-    // Logic to upload screenshot to a cloud storage (Firebase Storage, etc.)
-    // Placeholder: return a dummy URL for now.
+    // Placeholder logic to upload screenshot, return dummy URL
     return 'https://example.com/screenshot.png';
   }
 
@@ -165,8 +135,10 @@ class _LoanRepaymentPageState extends State<LoanRepaymentPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Loan Repayment'),
-        backgroundColor: Colors.teal,
+        title: Text('Loan Repayment', style: TextStyle(color: Colors.black)),
+        backgroundColor: Colors.white,
+        iconTheme: IconThemeData(color: Colors.black),
+        elevation: 1,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -192,7 +164,7 @@ class _LoanRepaymentPageState extends State<LoanRepaymentPage> {
             if (transactionReference != null)
               Text(
                 'Transaction Reference: $transactionReference',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blueGrey),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
               ),
             SizedBox(height: 16),
             TextField(
@@ -204,20 +176,13 @@ class _LoanRepaymentPageState extends State<LoanRepaymentPage> {
               ),
             ),
             SizedBox(height: 16),
-            TextField(
-              controller: _noteController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                labelText: 'Note to Admin',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            SizedBox(height: 16),
             Row(
               children: [
                 ElevatedButton(
                   onPressed: _pickImage,
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                  ),
                   child: Text('Upload Screenshot'),
                 ),
                 SizedBox(width: 10),
@@ -228,12 +193,13 @@ class _LoanRepaymentPageState extends State<LoanRepaymentPage> {
             ElevatedButton(
               onPressed: _makePayment,
               style: ElevatedButton.styleFrom(
-                padding: EdgeInsets.symmetric(vertical: 16), backgroundColor: Colors.teal,
+                padding: EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: Colors.black,
               ),
               child: Center(
                 child: Text(
                   'Make Payment',
-                  style: TextStyle(fontSize: 18),
+                  style: TextStyle(fontSize: 18, color: Colors.white),
                 ),
               ),
             ),

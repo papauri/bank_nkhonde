@@ -1,7 +1,7 @@
 import 'package:bank_nkhonde/Account%20Management/member_management_page.dart';
 import 'package:bank_nkhonde/Dashboard/Admin%20Dashboard/Group%20Management/edit_group_parameters.dart';
 import 'package:bank_nkhonde/Login%20Page/login_page.dart';
-import 'package:bank_nkhonde/Payment%20Management/loan_management_page.dart';
+import 'package:bank_nkhonde/Loan%20Management/admins_loan_management_page.dart';
 import 'package:bank_nkhonde/Payment%20Management/payment_management_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';

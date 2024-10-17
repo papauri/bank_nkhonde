@@ -86,28 +86,81 @@ class _ApplyForLoanPageState extends State<ApplyForLoanPage> {
           .doc(widget.groupId)
           .get();
 
-      QuerySnapshot confirmedPayments = await FirebaseFirestore.instance
+      QuerySnapshot contributionsSnapshot = await FirebaseFirestore.instance
           .collection('groups')
           .doc(widget.groupId)
           .collection('payments')
+          .where('paymentType', isEqualTo: 'Monthly Contribution')
           .where('status', isEqualTo: 'confirmed')
           .get();
 
-      double availableBalance = confirmedPayments.docs.fold(0.0, (sum, doc) {
-        if (['Monthly Contribution', 'Loan Repayment', 'Penalty Fee']
-            .contains(doc['paymentType'])) {
-          return sum + (doc['amount'] ?? 0.0).toDouble();
-        }
-        return sum;
+      QuerySnapshot loanRepaymentsSnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .collection('payments')
+          .where('paymentType', isEqualTo: 'Loan Repayment')
+          .where('status', isEqualTo: 'confirmed')
+          .get();
+
+      QuerySnapshot seedMoneySnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .collection('payments')
+          .where('paymentType', isEqualTo: 'Seed Money')
+          .where('status', isEqualTo: 'confirmed')
+          .get();
+
+      QuerySnapshot penaltiesSnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .collection('payments')
+          .where('paymentType', isEqualTo: 'Penalty Fee')
+          .where('status', isEqualTo: 'confirmed')
+          .get();
+
+      QuerySnapshot loansSnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .collection('loans')
+          .where('status', isEqualTo: 'approved')
+          .get();
+
+      // Calculate total contributions
+      double totalContributions = contributionsSnapshot.docs.fold(0.0, (sum, doc) {
+        return sum + (doc['amount'] ?? 0.0).toDouble();
       });
 
-      // Fetch loanPenalty from group data
+      // Calculate total loan repayments
+      double totalLoanRepayments = loanRepaymentsSnapshot.docs.fold(0.0, (sum, doc) {
+        return sum + (doc['amount'] ?? 0.0).toDouble();
+      });
+
+      // Calculate total seed money
+      double totalSeedMoney = seedMoneySnapshot.docs.fold(0.0, (sum, doc) {
+        return sum + (doc['amount'] ?? 0.0).toDouble();
+      });
+
+      // Calculate total penalties
+      double totalPenalties = penaltiesSnapshot.docs.fold(0.0, (sum, doc) {
+        return sum + (doc['amount'] ?? 0.0).toDouble();
+      });
+
+      // Calculate total approved loans
+      double totalLoans = loansSnapshot.docs.fold(0.0, (sum, doc) {
+        return sum + (doc['amount'] ?? 0.0).toDouble();
+      });
+
+      // Available balance = Total Contributions + Seed Money + Loan Repayments - Approved Loans - Penalties
+      double availableBalance = totalContributions + totalSeedMoney + totalLoanRepayments - totalLoans - totalPenalties;
+
+      // Fetch interestRate and loanPenalty from the group document
       double loanPenalty = (groupSnapshot['loanPenalty'] ?? 0.0).toDouble();
+      double interestRate = (groupSnapshot['interestRate'] ?? 0.0).toDouble();
 
       return {
         'availableBalance': availableBalance,
-        'interestRate': groupSnapshot['interestRate']?.toDouble() ?? 0.0,
-        'loanPenalty': loanPenalty, // Keep loanPenalty as the field name
+        'interestRate': interestRate,
+        'loanPenalty': loanPenalty,
       };
     } catch (e) {
       print('Error fetching group data: $e');
@@ -121,17 +174,14 @@ class _ApplyForLoanPageState extends State<ApplyForLoanPage> {
 
     if (loanAmountStr.isEmpty || parsedAmount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content:
-                Text('Please enter a valid loan amount greater than zero')),
+        SnackBar(content: Text('Please enter a valid loan amount greater than zero')),
       );
       return;
     }
 
     if (repaymentDueDate == null || borrowerName == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text('Please wait while we fetch borrower information.')),
+        SnackBar(content: Text('Please wait while we fetch borrower information.')),
       );
       return;
     }
@@ -143,65 +193,46 @@ class _ApplyForLoanPageState extends State<ApplyForLoanPage> {
 
       if (parsedAmount > availableBalance) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(
-                  'Loan amount cannot exceed the available group balance of MWK $availableBalance')),
+          SnackBar(content: Text('Loan amount cannot exceed the available group balance of MWK $availableBalance')),
         );
         return;
       }
-
       // Corrected logic for outstanding balance: confirmed loan + interest + penalty - repayments
-      double totalWithInterestAndPenalty =
-          parsedAmount * (1 + interestRate / 100);
+      double totalWithInterestAndPenalty = parsedAmount * (1 + interestRate / 100);
       if (groupData['loanPenalty'] != null && groupData['loanPenalty'] > 0) {
-        totalWithInterestAndPenalty +=
-            parsedAmount * (groupData['loanPenalty'] / 100);
+        totalWithInterestAndPenalty += parsedAmount * (groupData['loanPenalty'] / 100);
       }
 
-      // Calculate the monthly repayment for the loan
-      double monthlyRepayment =
-          totalWithInterestAndPenalty / widget.repaymentPeriod;
+      double monthlyRepayment = totalWithInterestAndPenalty / widget.repaymentPeriod;
 
-      var loanQuerySnapshot = await FirebaseFirestore.instance
+      var loanDocument = FirebaseFirestore.instance
           .collection('groups')
           .doc(widget.groupId)
           .collection('loans')
-          .where('userId', isEqualTo: widget.userId)
-          .get();
+          .doc();
 
-      if (loanQuerySnapshot.docs.isEmpty) {
-        var loanDocument = FirebaseFirestore.instance
-            .collection('groups')
-            .doc(widget.groupId)
-            .collection('loans')
-            .doc();
+      // Submit the loan details to Firestore
+      await loanDocument.set({
+        'userId': widget.userId,
+        'borrowerName': borrowerName, // Include borrower's name as borrowerName
+        'amount': parsedAmount,
+        'interestRate': interestRate,
+        'totalWithInterest': totalWithInterestAndPenalty,
+        'monthlyRepayment': monthlyRepayment,
+        'status': 'pending',
+        'appliedAt': Timestamp.now(),
+        'dueDate': Timestamp.fromDate(repaymentDueDate!),
+        'repaymentPeriod': widget.repaymentPeriod,
+        'outstandingBalance': totalWithInterestAndPenalty,
+        'loanPenalty': groupData['loanPenalty'] ?? 0.0,
+        'transactionReference': transactionReference,
+      });
 
-        await loanDocument.set({
-          'userId': widget.userId,
-          'borrowerName': borrowerName, // Include borrower's name as borrowerName
-          'amount': parsedAmount,
-          'interestRate': interestRate, // Interest rate is already a percentage
-          'totalWithInterest': totalWithInterestAndPenalty,
-          'monthlyRepayment': monthlyRepayment,
-          'status': 'pending',
-          'appliedAt': Timestamp.now(),
-          'dueDate': Timestamp.fromDate(repaymentDueDate!), // Set due date
-          'repaymentPeriod': widget.repaymentPeriod,
-          'outstandingBalance': totalWithInterestAndPenalty,
-          'loanPenalty': groupData['loanPenalty'] ?? 0.0, // Store loanPenalty as percentage in the loan collection
-          'transactionReference': transactionReference, // Add the transaction reference here
-        });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Loan application submitted successfully!')),
+      );
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Loan application submitted successfully!')),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('You already have an active loan application.')),
-        );
-      }
-
-      Navigator.pop(context);
+      Navigator.pop(context); // Close the page after loan submission
     } catch (e) {
       print('Error applying for loan: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -246,10 +277,12 @@ class _ApplyForLoanPageState extends State<ApplyForLoanPage> {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                                            Text(
+                      Text(
                         'Available Balance to Borrow: MWK ${availableBalance.toStringAsFixed(2)}',
                         style: TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold),
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       SizedBox(height: 10),
                       Text(

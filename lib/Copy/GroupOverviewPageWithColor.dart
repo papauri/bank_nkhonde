@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../Payment Management/contributions_overview_page.dart';
-import '../Payment Management/loan_management_page.dart';
-import '../Payment Management/admins_loans_page.dart';
+import '../Loan Management/admins_loan_management_page.dart';
+import '../Loan Management/admins_loans_page.dart';
 import '../Payment Management/payment_management_page.dart';
 import '../Account Management/member_management_page.dart';
 

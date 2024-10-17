@@ -71,19 +71,11 @@ class _LoanManagementPageState extends State<LoanManagementPage> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (loan['status'] == 'approved')
-                        IconButton(
-                          icon: Icon(Icons.undo, color: Colors.orange),
-                          onPressed: () {
-                            _revertApproval(loan.id);
-                          },
-                          tooltip: 'Revert Approval',
-                        ),
                       if (loan['status'] == 'pending')
                         IconButton(
                           icon: Icon(Icons.check, color: Colors.green),
                           onPressed: () {
-                            _approveLoan(loan.id);
+                            _approveLoan(loan.id, loanAmount);
                           },
                           tooltip: 'Approve Loan',
                         ),
@@ -105,9 +97,118 @@ class _LoanManagementPageState extends State<LoanManagementPage> {
     );
   }
 
-  // Approve Loan
-  void _approveLoan(String loanId) async {
+  // Function to calculate available balance dynamically
+  Future<double> _calculateAvailableBalance() async {
     try {
+      QuerySnapshot contributionsSnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .collection('payments')
+          .where('paymentType', isEqualTo: 'Monthly Contribution')
+          .where('status', isEqualTo: 'confirmed')
+          .get();
+
+      QuerySnapshot loanRepaymentsSnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .collection('payments')
+          .where('paymentType', isEqualTo: 'Loan Repayment')
+          .where('status', isEqualTo: 'confirmed')
+          .get();
+
+      QuerySnapshot seedMoneySnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .collection('payments')
+          .where('paymentType', isEqualTo: 'Seed Money')
+          .where('status', isEqualTo: 'confirmed')
+          .get();
+
+      QuerySnapshot penaltiesSnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .collection('payments')
+          .where('paymentType', isEqualTo: 'Penalty Fee')
+          .where('status', isEqualTo: 'confirmed')
+          .get();
+
+      QuerySnapshot loansSnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .collection('loans')
+          .where('status', isEqualTo: 'approved')
+          .get();
+
+      // Calculate total contributions
+      double totalContributions = contributionsSnapshot.docs.fold(0.0, (sum, doc) {
+        return sum + (doc['amount'] ?? 0.0).toDouble();
+      });
+
+      // Calculate total loan repayments
+      double totalLoanRepayments = loanRepaymentsSnapshot.docs.fold(0.0, (sum, doc) {
+        return sum + (doc['amount'] ?? 0.0).toDouble();
+      });
+
+      // Calculate total seed money
+      double totalSeedMoney = seedMoneySnapshot.docs.fold(0.0, (sum, doc) {
+        return sum + (doc['amount'] ?? 0.0).toDouble();
+      });
+
+      // Calculate total penalties
+      double totalPenalties = penaltiesSnapshot.docs.fold(0.0, (sum, doc) {
+        return sum + (doc['amount'] ?? 0.0).toDouble();
+      });
+
+      // Calculate total approved loans
+      double totalLoans = loansSnapshot.docs.fold(0.0, (sum, doc) {
+        return sum + (doc['amount'] ?? 0.0).toDouble();
+      });
+
+      // Available balance = Total Contributions + Seed Money + Loan Repayments - Approved Loans - Penalties
+      double availableBalance = totalContributions + totalSeedMoney + totalLoanRepayments - totalLoans - totalPenalties;
+
+      return availableBalance;
+    } catch (e) {
+      print('Error calculating available balance: $e');
+      return 0.0;
+    }
+  }
+
+  // Function to approve the loan
+  void _approveLoan(String loanId, double loanAmount) async {
+    try {
+      // Fetch the available balance dynamically
+      double availableBalance = await _calculateAvailableBalance();
+
+      if (loanAmount > availableBalance) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Insufficient funds to approve the loan.')),
+        );
+        return;
+      }
+
+      DocumentSnapshot loanSnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .collection('loans')
+          .doc(loanId)
+          .get();
+
+      if (!loanSnapshot.exists) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Loan not found.')),
+        );
+        return;
+      }
+
+      String transactionReference = loanSnapshot['transactionReference'] ?? '';
+      if (transactionReference.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Loan missing transaction reference.')),
+        );
+        return;
+      }
+
       await FirebaseFirestore.instance
           .collection('groups')
           .doc(widget.groupId)
@@ -115,39 +216,22 @@ class _LoanManagementPageState extends State<LoanManagementPage> {
           .doc(loanId)
           .update({
         'status': 'approved',
+        'approvedAt': Timestamp.now(),
+        'transactionReference': transactionReference,
       });
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Loan approved successfully!')),
       );
     } catch (e) {
+      print('Error approving loan: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to approve loan. Try again.')),
       );
     }
   }
 
-  // Revert loan approval back to pending
-  void _revertApproval(String loanId) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('groups')
-          .doc(widget.groupId)
-          .collection('loans')
-          .doc(loanId)
-          .update({
-        'status': 'pending',
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Loan approval reverted successfully.')),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to revert approval. Try again.')),
-      );
-    }
-  }
-
-  // Reject Loan
+  // Function to reject the loan
   void _rejectLoan(String loanId) async {
     try {
       await FirebaseFirestore.instance
@@ -162,6 +246,7 @@ class _LoanManagementPageState extends State<LoanManagementPage> {
         SnackBar(content: Text('Loan rejected.')),
       );
     } catch (e) {
+      print('Error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to reject loan. Try again.')),
       );
