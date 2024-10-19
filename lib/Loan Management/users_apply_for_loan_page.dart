@@ -168,78 +168,89 @@ class _ApplyForLoanPageState extends State<ApplyForLoanPage> {
     }
   }
 
-  Future<void> _applyForLoan(BuildContext context) async {
-    final String loanAmountStr = _amountController.text.trim();
-    double parsedAmount = double.tryParse(loanAmountStr) ?? 0.0;
+Future<void> _applyForLoan(BuildContext context) async {
+  final String loanAmountStr = _amountController.text.trim();
+  double parsedAmount = double.tryParse(loanAmountStr) ?? 0.0;
 
-    if (loanAmountStr.isEmpty || parsedAmount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please enter a valid loan amount greater than zero')),
-      );
-      return;
-    }
-
-    if (repaymentDueDate == null || borrowerName == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please wait while we fetch borrower information.')),
-      );
-      return;
-    }
-
-    try {
-      Map<String, dynamic> groupData = await _fetchGroupData();
-      double availableBalance = groupData['availableBalance'];
-      double interestRate = groupData['interestRate'];
-
-      if (parsedAmount > availableBalance) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Loan amount cannot exceed the available group balance of MWK $availableBalance')),
-        );
-        return;
-      }
-      // Corrected logic for outstanding balance: confirmed loan + interest + penalty - repayments
-      double totalWithInterestAndPenalty = parsedAmount * (1 + interestRate / 100);
-      if (groupData['loanPenalty'] != null && groupData['loanPenalty'] > 0) {
-        totalWithInterestAndPenalty += parsedAmount * (groupData['loanPenalty'] / 100);
-      }
-
-      double monthlyRepayment = totalWithInterestAndPenalty / widget.repaymentPeriod;
-
-      var loanDocument = FirebaseFirestore.instance
-          .collection('groups')
-          .doc(widget.groupId)
-          .collection('loans')
-          .doc();
-
-      // Submit the loan details to Firestore
-      await loanDocument.set({
-        'userId': widget.userId,
-        'borrowerName': borrowerName, // Include borrower's name as borrowerName
-        'amount': parsedAmount,
-        'interestRate': interestRate,
-        'totalWithInterest': totalWithInterestAndPenalty,
-        'monthlyRepayment': monthlyRepayment,
-        'status': 'pending',
-        'appliedAt': Timestamp.now(),
-        'dueDate': Timestamp.fromDate(repaymentDueDate!),
-        'repaymentPeriod': widget.repaymentPeriod,
-        'outstandingBalance': totalWithInterestAndPenalty,
-        'loanPenalty': groupData['loanPenalty'] ?? 0.0,
-        'transactionReference': transactionReference,
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Loan application submitted successfully!')),
-      );
-
-      Navigator.pop(context); // Close the page after loan submission
-    } catch (e) {
-      print('Error applying for loan: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to apply for loan. Please try again.')),
-      );
-    }
+  if (loanAmountStr.isEmpty || parsedAmount <= 0) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Please enter a valid loan amount greater than zero')),
+    );
+    return;
   }
+
+  if (repaymentDueDate == null || borrowerName == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Please wait while we fetch borrower information.')),
+    );
+    return;
+  }
+
+  try {
+    Map<String, dynamic> groupData = await _fetchGroupData();
+    double availableBalance = groupData['availableBalance'];
+    double interestRate = groupData['interestRate'];
+
+    if (parsedAmount > availableBalance) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Loan amount cannot exceed the available group balance of MWK $availableBalance')),
+      );
+      return;
+    }
+
+    // Generate unique loan ID
+    String loanId = _generateLoanId();
+
+    // Total amount with interest
+    double totalWithInterestAndPenalty = parsedAmount * (1 + interestRate / 100);
+    if (groupData['loanPenalty'] != null && groupData['loanPenalty'] > 0) {
+      totalWithInterestAndPenalty += parsedAmount * (groupData['loanPenalty'] / 100);
+    }
+
+    double monthlyRepayment = totalWithInterestAndPenalty / widget.repaymentPeriod;
+
+    // Add loan to the Firestore
+    var loanDocument = FirebaseFirestore.instance
+        .collection('groups')
+        .doc(widget.groupId)
+        .collection('loans')
+        .doc(loanId);
+
+    await loanDocument.set({
+      'loanId': loanId, // Store the unique Loan ID
+      'userId': widget.userId,
+      'borrowerName': borrowerName,
+      'amount': parsedAmount,
+      'interestRate': interestRate,
+      'totalWithInterest': totalWithInterestAndPenalty,
+      'monthlyRepayment': monthlyRepayment,
+      'status': 'pending',
+      'appliedAt': Timestamp.now(),
+      'dueDate': Timestamp.fromDate(repaymentDueDate!),
+      'repaymentPeriod': widget.repaymentPeriod,
+      'outstandingBalance': totalWithInterestAndPenalty,
+      'loanPenalty': groupData['loanPenalty'] ?? 0.0,
+      'transactionReference': transactionReference,
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Loan application submitted successfully! Loan ID: $loanId')),
+    );
+
+    Navigator.pop(context); // Close the page after loan submission
+  } catch (e) {
+    print('Error applying for loan: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Failed to apply for loan. Please try again.')),
+    );
+  }
+}
+
+// Generate a unique Loan ID for each loan
+String _generateLoanId() {
+  return DateTime.now().millisecondsSinceEpoch.toString(); // Or use any other method for unique ID
+}
+
 
   @override
   Widget build(BuildContext context) {

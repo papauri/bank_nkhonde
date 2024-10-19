@@ -22,7 +22,7 @@ class _SeedMoneyPaymentPageState extends State<SeedMoneyPaymentPage> {
   double? seedMoneyAmount;
   double? totalOwed;
   bool _isSubmitting = false;
-  String? selectedReference; // Define selectedReference here
+  String? selectedReference;
 
   @override
   void initState() {
@@ -82,6 +82,7 @@ class _SeedMoneyPaymentPageState extends State<SeedMoneyPaymentPage> {
           'transactionReference': _transactionReferenceController.text.trim(),
           'status': 'pending',
           'paymentDate': Timestamp.now(),
+          'payerName': payerName, // Add payerName to the payment record
           'screenshotUrl': null, // Add upload logic if needed
         });
 
@@ -166,6 +167,8 @@ class _SeedMoneyPaymentPageState extends State<SeedMoneyPaymentPage> {
   }
 
   Widget _buildAmountSection() {
+    final isOwed = totalOwed != null && totalOwed! > 0;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -176,82 +179,95 @@ class _SeedMoneyPaymentPageState extends State<SeedMoneyPaymentPage> {
           controller: _amountController,
           decoration: InputDecoration(labelText: 'Enter Amount (MWK)'),
           keyboardType: TextInputType.number,
+          enabled: isOwed,
         ),
         TextButton(
-          onPressed: () {
-            setState(() {
-              _amountController.text = totalOwed!.toStringAsFixed(2);
-            });
-          },
+          onPressed: isOwed
+              ? () {
+                  setState(() {
+                    _amountController.text = totalOwed!.toStringAsFixed(2);
+                  });
+                }
+              : null,
           child: Text('Auto-Populate Total Owed'),
         ),
+        if (!isOwed)
+          Text(
+            'No balance owed for this year. You have paid the full amount.',
+            style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+          ),
       ],
     );
   }
 
-Widget _buildTransactionReferenceSection() {
-  final currentYear = DateFormat('yyyy').format(DateTime.now());
-  final currentMonth = DateFormat('MMMM').format(DateTime.now());
+  Widget _buildTransactionReferenceSection() {
+    final currentYear = DateFormat('yyyy').format(DateTime.now());
+    final currentMonth = DateFormat('MMMM').format(DateTime.now());
 
-  List<String> referenceOptions = [
-    'Seed Money - $currentMonth $currentYear',
-    'Seed Money - Custom',
-  ];
+    List<String> referenceOptions = [
+      'Seed Money - $currentMonth $currentYear',
+      'Seed Money - Custom',
+    ];
 
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Text(
-        'Transaction Reference:',
-        style: TextStyle(fontWeight: FontWeight.bold),
-      ),
-      SizedBox(height: 8),
-      DropdownButton<String>(
-        value: selectedReference,
-        onChanged: (String? newValue) {
-          setState(() {
-            selectedReference = newValue;
-
-            // If 'Custom' is selected, show the custom reference text field
-            if (newValue != null && newValue == 'Seed Money - Custom') {
-              _transactionReferenceController.clear();
-            } else {
-              _transactionReferenceController.text = newValue!;
-            }
-          });
-        },
-        items: referenceOptions.map<DropdownMenuItem<String>>((String value) {
-          return DropdownMenuItem<String>(
-            value: value,
-            child: Text(value),
-          );
-        }).toList(),
-      ),
-      if (selectedReference == 'Seed Money - Custom') ...[
-        SizedBox(height: 8),
-        TextField(
-          controller: _transactionReferenceController,
-          decoration: InputDecoration(labelText: 'Enter Custom Reference'),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Transaction Reference:',
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
+        SizedBox(height: 8),
+        DropdownButton<String>(
+          value: selectedReference,
+          onChanged: (totalOwed != null && totalOwed! > 0)
+              ? (String? newValue) {
+                  setState(() {
+                    selectedReference = newValue;
+
+                    // If 'Custom' is selected, show the custom reference text field
+                    if (newValue != null && newValue == 'Seed Money - Custom') {
+                      _transactionReferenceController.clear();
+                    } else {
+                      _transactionReferenceController.text = newValue!;
+                    }
+                  });
+                }
+              : null,
+          items: referenceOptions.map<DropdownMenuItem<String>>((String value) {
+            return DropdownMenuItem<String>(
+              value: value,
+              child: Text(value),
+            );
+          }).toList(),
+        ),
+        if (selectedReference == 'Seed Money - Custom') ...[
+          SizedBox(height: 8),
+          TextField(
+            controller: _transactionReferenceController,
+            decoration: InputDecoration(labelText: 'Enter Custom Reference'),
+            enabled: totalOwed != null && totalOwed! > 0,
+          ),
+        ],
       ],
-    ],
-  );
-}
+    );
+  }
 
   Widget _buildScreenshotButton() {
+    final isOwed = totalOwed != null && totalOwed! > 0;
     return OutlinedButton.icon(
-      onPressed: _pickScreenshot,
+      onPressed: isOwed ? _pickScreenshot : null,
       icon: Icon(Icons.image),
-      label: Text(_screenshotFile == null ? 'Upload Proof of Payment Screenshot' : 'Screenshot Selected'),
+            label: Text(_screenshotFile == null ? 'Upload Proof of Payment Screenshot' : 'Screenshot Selected'),
     );
   }
 
   Widget _buildSubmitButton() {
+    final isOwed = totalOwed != null && totalOwed! > 0;
     return _isSubmitting
         ? Center(child: CircularProgressIndicator())
         : ElevatedButton(
-            onPressed: _submitPayment,
-            child: Text('Submit Payment'),
+            onPressed: isOwed ? _submitPayment : null,
+            child: Text(isOwed ? 'Submit Payment' : 'No Payment Needed'),
           );
   }
 
@@ -306,3 +322,4 @@ Widget _buildTransactionReferenceSection() {
     );
   }
 }
+

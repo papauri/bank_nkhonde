@@ -45,7 +45,7 @@ class _PaymentManagementPageState extends State<PaymentManagementPage> {
               return Center(child: Text('No payments found.'));
             }
 
-            // Group payments by status, month, and user
+            // Group payments by payment type, month, and user
             Map<String, Map<String, Map<String, List<QueryDocumentSnapshot>>>>
                 groupedPayments = {};
 
@@ -53,7 +53,7 @@ class _PaymentManagementPageState extends State<PaymentManagementPage> {
               final paymentDate =
                   (payment['paymentDate'] as Timestamp).toDate();
               String monthYear = DateFormat('MMMM yyyy').format(paymentDate);
-              String status = payment['status'];
+              String paymentType = payment['paymentType'];
 
               // Check if 'payerName' exists, and provide a fallback if it's null
               Map<String, dynamic>? paymentData = payment.data()
@@ -64,32 +64,25 @@ class _PaymentManagementPageState extends State<PaymentManagementPage> {
                       ? paymentData['payerName'] as String
                       : 'Unknown Payer'; // Fallback if 'payerName' is missing
 
-              groupedPayments[status] = groupedPayments[status] ?? {};
-              groupedPayments[status]![monthYear] =
-                  groupedPayments[status]![monthYear] ?? {};
-              groupedPayments[status]![monthYear]![payerName] =
-                  groupedPayments[status]![monthYear]![payerName] ?? [];
-              groupedPayments[status]![monthYear]![payerName]!.add(payment);
+              groupedPayments[paymentType] = groupedPayments[paymentType] ?? {};
+              groupedPayments[paymentType]![monthYear] =
+                  groupedPayments[paymentType]![monthYear] ?? {};
+              groupedPayments[paymentType]![monthYear]![payerName] =
+                  groupedPayments[paymentType]![monthYear]![payerName] ?? [];
+              groupedPayments[paymentType]![monthYear]![payerName]!.add(payment);
             }
 
             return ListView(
               padding: const EdgeInsets.all(16.0),
               children: [
-                _buildPaymentSection(
-                    'Pending Payments',
-                    groupedPayments['pending'],
-                    Icons.pending_actions,
-                    Colors.orange),
-                _buildPaymentSection(
-                    'Confirmed Payments',
-                    groupedPayments['confirmed'],
-                    Icons.check_circle,
-                    Colors.green),
-                _buildPaymentSection(
-                    'Rejected Payments',
-                    groupedPayments['rejected'],
-                    Icons.cancel,
-                    Colors.redAccent),
+                _buildPaymentCategorySection('Seed Money Payments',
+                    groupedPayments['Seed Money'], Colors.purple),
+                _buildPaymentCategorySection('Quarterly Payments',
+                    groupedPayments['Quarterly Payment'], Colors.teal),
+                _buildPaymentCategorySection('Penalty Payments',
+                    groupedPayments['Penalty'], Colors.red),
+                _buildPaymentCategorySection('Monthly Contributions',
+                    groupedPayments['Monthly Contribution'], Colors.blue),
               ],
             );
           },
@@ -98,10 +91,9 @@ class _PaymentManagementPageState extends State<PaymentManagementPage> {
     );
   }
 
-  Widget _buildPaymentSection(
+  Widget _buildPaymentCategorySection(
       String title,
       Map<String, Map<String, List<QueryDocumentSnapshot>>>? paymentsByMonth,
-      IconData icon,
       Color statusColor) {
     if (paymentsByMonth == null || paymentsByMonth.isEmpty) {
       return Container(); // Hide if empty
@@ -114,7 +106,7 @@ class _PaymentManagementPageState extends State<PaymentManagementPage> {
         borderRadius: BorderRadius.circular(12),
       ),
       child: ExpansionTile(
-        leading: Icon(icon, color: statusColor, size: 30),
+        leading: Icon(Icons.payment, color: statusColor, size: 30),
         title: Text(
           title,
           style: TextStyle(
@@ -194,7 +186,8 @@ class _PaymentManagementPageState extends State<PaymentManagementPage> {
                     if (payment['screenshotUrl'] != null)
                       GestureDetector(
                         onTap: () {
-                          _showImageDialog(context, payment['screenshotUrl']);
+                          _showImageDialog(
+                              context, payment['screenshotUrl']);
                         },
                         child: Text(
                           'View Screenshot',
@@ -305,10 +298,10 @@ class _PaymentManagementPageState extends State<PaymentManagementPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Payment confirmed and contributions updated!')),
       );
-    } catch (e) {
+        } catch (e) {
       print("Error confirming payment: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to confirm payment.')),
+        SnackBar(content: Text('Failed to confirm payment. Please try again.')),
       );
     }
   }
@@ -324,9 +317,12 @@ class _PaymentManagementPageState extends State<PaymentManagementPage> {
         'status': 'rejected',
         'reason': reason,
       });
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Payment rejected successfully!')),
       );
+
+      _refreshPayments();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to reject payment. Try again.')),

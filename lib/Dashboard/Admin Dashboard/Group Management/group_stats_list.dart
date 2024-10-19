@@ -16,7 +16,7 @@ class GroupStatsList extends StatelessWidget {
     required this.interestRate,
     required this.fixedAmount,
     required this.onStatTapped,
-    required this.onViewMembers,
+    required this.onViewMembers, required int pendingLoanRepayments, required double pendingRepaymentAmount,
   });
 
   @override

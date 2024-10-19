@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+import 'group_summary_info_box.dart'; // Import the file for the new logic
 import '../../Loan Management/loan_services_page.dart';
 import 'member_list_tile.dart';
-import 'user_payment_page.dart'; // Import the new payment page
-import 'user_payment_details_page.dart'; // Import for navigating to payment details
-import 'seed_money_payment_page.dart'; // Import the Seed Money Payment Page
+import 'user_payment_page.dart';
+import 'user_payment_details_page.dart';
+import 'seed_money_payment_page.dart';
 
 class GroupDetailsPage extends StatefulWidget {
   final String groupId;
@@ -118,21 +120,22 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
             ),
             SizedBox(height: 16),
 
+            // Dynamic Key Group Info Box - placeholder
+            GroupSummaryInfoBox(groupId: widget.groupId), // Placeholder for dynamic data box
+            SizedBox(height: 16),
+
             _buildMonthlyFinancialOverview(),
             SizedBox(height: 16),
 
             _buildSeedMoneyOverview(),
             SizedBox(height: 16),
 
-            // Loan Services Tile
             _buildLoanServicesTile(),
             SizedBox(height: 16),
 
-            // Make Payment button
             _buildPaymentButton(Colors.blueGrey[800]!),
             SizedBox(height: 16),
 
-            // Group Members section at the bottom
             Text(
               'Group Members',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
@@ -198,134 +201,139 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     );
   }
 
-  Widget _buildMonthlyFinancialOverview() {
-    return GestureDetector(
-      onTap: () {
-        // Navigate to user payment details page
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PaymentDetailsPage(
-                groupId: widget.groupId, userId: widget.userId),
+Widget _buildMonthlyFinancialOverview() {
+  String currentMonth = DateFormat('MMMM').format(DateTime.now()); // Get current month
+  return GestureDetector(
+    onTap: () {
+      // Navigate to user payment details page
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PaymentDetailsPage(
+              groupId: widget.groupId, userId: widget.userId),
+        ),
+      );
+    },
+    child: Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.3),
+            spreadRadius: 2,
+            blurRadius: 8,
+            offset: Offset(0, 3),
           ),
-        );
-      },
-      child: Container(
-        padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.3),
-              spreadRadius: 2,
-              blurRadius: 8,
-              offset: Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Amount Owed for the Month',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'MWK ${amountOwedForMonth.toStringAsFixed(2)}',
-                  style: TextStyle(fontSize: 18, color: Colors.orange),
-                ),
-              ],
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  'Amount Paid',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'MWK ${amountPaidForMonth.toStringAsFixed(2)}',
-                  style: TextStyle(fontSize: 18, color: Colors.green),
-                ),
-              ],
-            ),
-          ],
-        ),
+        ],
       ),
-    );
-  }
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Total Paid in $currentMonth',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'MWK ${amountPaidForMonth.toStringAsFixed(2)}',
+                style: TextStyle(fontSize: 18, color: Colors.green, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                'Outstanding',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
+              ),
+              SizedBox(height: 4),
+              Text(
+               'Balance: MWK ${amountOwedForMonth.toStringAsFixed(2)}',
+                style: TextStyle(fontSize: 18, color: Colors.red, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
-  Widget _buildSeedMoneyOverview() {
-    double seedMoneyBalance = seedMoneyAmount - seedMoneyPaid;
-    return GestureDetector(
-      onTap: () {
-        // Navigate to Seed Money Payment Page
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => SeedMoneyPaymentPage(groupId: widget.groupId),
+Widget _buildSeedMoneyOverview() {
+  String currentYear = DateFormat('yyyy').format(DateTime.now()); // Get current year
+  double seedMoneyBalance = seedMoneyAmount - seedMoneyPaid;
+
+  return GestureDetector(
+    onTap: () {
+      // Navigate to Seed Money Payment Page
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => SeedMoneyPaymentPage(groupId: widget.groupId),
+        ),
+      );
+    },
+    child: Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.3),
+            spreadRadius: 2,
+            blurRadius: 8,
+            offset: Offset(0, 3),
           ),
-        );
-      },
-      child: Container(
-        padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.3),
-              spreadRadius: 2,
-              blurRadius: 8,
-              offset: Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Seed Money Payment',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'MWK ${seedMoneyPaid.toStringAsFixed(2)}',
-                  style: TextStyle(fontSize: 18, color: Colors.green),
-                ),
-              ],
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  'Balance',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'MWK ${seedMoneyBalance.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: seedMoneyBalance > 0 ? Colors.red : Colors.green,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+        ],
       ),
-    );
-  }
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Seed Money for $currentYear',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Paid: MWK ${seedMoneyPaid.toStringAsFixed(2)}',
+                style: TextStyle(fontSize: 18, color: Colors.green, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                'Outstanding',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Balance: MWK ${seedMoneyBalance.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: seedMoneyBalance > 0 ? Colors.red : Colors.green,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 
   Widget _buildPaymentButton(Color primaryColor) {
     return ElevatedButton(

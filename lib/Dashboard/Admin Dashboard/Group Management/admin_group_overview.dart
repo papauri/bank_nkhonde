@@ -31,6 +31,8 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
   double fixedAmount = 0.0;
   double quarterlyPaymentAmount = 0.0;
   int pendingPaymentsCount = 0;
+  int pendingLoanRepayments = 0;
+  double pendingRepaymentAmount = 0.0;
 
   @override
   void initState() {
@@ -41,7 +43,7 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
   Future<void> _fetchGroupData() async {
     await Future.wait([
       _fetchBasicGroupDetails(),
-      _fetchPendingLoans(),
+      _fetchPendingLoansAndRepayments(),
       _fetchContributions(),
       _fetchPendingPayments(),
       _fetchCurrentMonthContributions(),
@@ -70,7 +72,7 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
     }
   }
 
-  Future<void> _fetchPendingLoans() async {
+  Future<void> _fetchPendingLoansAndRepayments() async {
     try {
       QuerySnapshot loanSnapshot = await FirebaseFirestore.instance
           .collection('groups')
@@ -79,24 +81,39 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
           .where('status', isEqualTo: 'pending')
           .get();
 
-      double totalPendingAmount = loanSnapshot.docs
-          .fold(0.0, (sum, loan) => sum + (loan['amount']?.toDouble() ?? 0.0));
+      QuerySnapshot repaymentsSnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .collection('payments')
+          .where('status', isEqualTo: 'pending')
+          .where('paymentType', isEqualTo: 'Loan Repayment')
+          .get();
+
+      double totalPendingLoanAmount = loanSnapshot.docs.fold(0.0, (sum, loan) {
+        return sum + (loan['amount']?.toDouble() ?? 0.0);
+      });
+
+      double totalPendingRepaymentAmount = repaymentsSnapshot.docs.fold(0.0, (sum, repayment) {
+        return sum + (repayment['amount']?.toDouble() ?? 0.0);
+      });
 
       setState(() {
-        pendingLoanAmount = totalPendingAmount;
+        pendingLoanAmount = totalPendingLoanAmount;
         pendingLoanApplicants = loanSnapshot.docs.length;
+        pendingLoanRepayments = repaymentsSnapshot.docs.length;
+        pendingRepaymentAmount = totalPendingRepaymentAmount;
       });
     } catch (e) {
-      _showError('Failed to fetch pending loans.');
+      _showError('Failed to fetch pending loans and repayments.');
     }
   }
 
   Future<void> _fetchContributions() async {
     try {
-      double contributionsSum = 0.0,
-          loanPaymentsSum = 0.0,
-          penaltiesSum = 0.0,
-          interestSum = 0.0;
+      double contributionsSum = 0.0;
+      double loanPaymentsSum = 0.0;
+      double penaltiesSum = 0.0;
+      double interestSum = 0.0;
 
       QuerySnapshot monthlyPaymentsSnapshot = await FirebaseFirestore.instance
           .collection('groups')
@@ -125,8 +142,7 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
 
       setState(() {
         totalContributions = contributionsSum;
-        totalYearlyContributions =
-            contributionsSum + loanPaymentsSum + penaltiesSum + interestSum;
+        totalYearlyContributions = contributionsSum + loanPaymentsSum + penaltiesSum + interestSum;
       });
     } catch (e) {
       _showError('Failed to fetch total contributions.');
@@ -164,8 +180,7 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
           .where('paymentType', isEqualTo: 'Monthly Contribution')
           .get();
 
-      double currentMonthSum =
-          currentMonthPaymentsSnapshot.docs.fold(0.0, (sum, payment) {
+      double currentMonthSum = currentMonthPaymentsSnapshot.docs.fold(0.0, (sum, payment) {
         DateTime paymentDate = (payment['paymentDate'] as Timestamp).toDate();
         String paymentMonth = DateFormat('MMMM yyyy').format(paymentDate);
         return paymentMonth == currentMonth
@@ -213,6 +228,8 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
               ),
               GroupStatsList(
                 pendingLoanApplicants: pendingLoanApplicants,
+                pendingLoanRepayments: pendingLoanRepayments,
+                pendingRepaymentAmount: pendingRepaymentAmount,
                 pendingPaymentsCount: pendingPaymentsCount,
                 seedMoney: seedMoney,
                 interestRate: interestRate,
@@ -249,22 +266,23 @@ class _GroupOverviewPageState extends State<GroupOverviewPage> {
         ],
         onTap: (index) {
           switch (index) {
-            case 0: // Case for logout
+            case 0:
               _handleLogout(context);
               break;
-            case 1: // Case for loans
+            case 1:
               _navigateToPage(LoanManagementPage(
                 groupId: widget.groupId,
                 groupName: widget.groupName,
               ));
               break;
-            case 2: // Case for payments
+            case 2:
               _navigateToPage(PaymentManagementPage(
-                groupId: widget.groupId,
+                groupId: widget.groupId
+                ,
                 groupName: widget.groupName,
               ));
               break;
-            case 3: // Case for settings
+            case 3:
               _showEditGroupParametersDialog();
               break;
           }
